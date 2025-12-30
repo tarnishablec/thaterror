@@ -1,12 +1,5 @@
-import type { ErrorFamily, ErrorMap, ErrorMapOf, ErrorUnionOf } from "./types";
+import type { EnrolledErrorFamily, ErrorFamily, ErrorMapOf, ErrorUnionOf } from "./types";
 
-const TransformersField = Symbol("FErrorEnrollTransformers");
-
-export type EnrolledErrorFamily<M extends ErrorMap, Es extends readonly Error[] = []> =
-    (ErrorFamily<M> & {
-        readonly [ TransformersField ]: Map<new(...args: never[]) => Es[number], (error: Es[number]) => ErrorUnionOf<ErrorFamily<M>>>;
-        from(error: Es[number]): ErrorUnionOf<ErrorFamily<M>>;
-    });
 
 export function enroll<
     F,

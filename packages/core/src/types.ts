@@ -42,11 +42,22 @@ export type ErrorFamily<M extends ErrorMap> = {
 };
 
 export type ErrorUnionOf<F> =
-    F extends ErrorFamily<infer _M>
+    F extends EnrolledErrorFamily<infer _EM, infer _Es> | ErrorFamily<infer _M>
         ? ReturnType<F[keyof F & string]>
         : never;
 
+
+const TransformersField = Symbol("FErrorEnrollTransformers");
+
+export type EnrolledErrorFamily<M extends ErrorMap, Es extends readonly Error[] = []> =
+    (ErrorFamily<M> & {
+        readonly [ TransformersField ]: Map<new(...args: never[]) => Es[number], (error: Es[number]) => ErrorUnionOf<ErrorFamily<M>>>;
+        from(error: Es[number]): ErrorUnionOf<ErrorFamily<M>>;
+    });
+
+
 export type ErrorMapOf<F> =
-    F extends ErrorFamily<infer M>
-        ? M
-        : never;
+    F extends EnrolledErrorFamily<infer EM, infer _Es> ? EM :
+        F extends ErrorFamily<infer M>
+            ? M
+            : never;
