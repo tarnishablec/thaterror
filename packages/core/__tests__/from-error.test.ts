@@ -3,6 +3,10 @@ import { enroll } from '@ferror/core'
 import { HTTPException } from 'hono/http-exception'
 import { AppError } from './define-error.test'
 
+class MyCustomError extends Error {
+}
+
+
 describe('ErrorFamily from native error testing', () => {
     test('should chain up error family', () => {
         const family = enroll(
@@ -12,12 +16,13 @@ describe('ErrorFamily from native error testing', () => {
 
         const httpException = new HTTPException(404, {message: 'Not Found'})
         const err = family.from(httpException);
-
-        switch (err) {
-
-        }
-
         expect(err.cause).toBe(httpException)
+
+
+        const exFamily = enroll(
+            family, MyCustomError, (e) => {
+                return family.Unauthorized({cause: e})
+            })
 
 
         // expect(error).toBeInstanceOf(AppError)
