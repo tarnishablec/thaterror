@@ -15,6 +15,10 @@ export interface DefinedError<
 
 export type ErrorSpec =
     | string
+    /**
+     * Uses `never[]` to leverage contravariance, ensuring it can
+     * serve as a base type for functions with any parameter types.
+     */
     | ((...args: never[]) => string);
 
 export type ExtractPayload<S extends ErrorSpec> =
