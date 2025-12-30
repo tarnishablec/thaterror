@@ -1,4 +1,4 @@
-export const ErrorBrand = Symbol("FErrorBrand");
+export const ErrorBrand: unique symbol = Symbol("FErrorBrand");
 
 export interface DefinedError<
     Code extends string = string,
@@ -28,7 +28,4 @@ export type ErrorFamily<M extends ErrorMap> = {
 };
 
 
-export type ErrorOf<
-    F extends ErrorFamily<ErrorMap>
-> =
-    ReturnType<F[keyof F & string]>;
+export type ErrorOf<F extends ErrorFamily<ErrorMap>> = ReturnType<F[keyof F & string]>;

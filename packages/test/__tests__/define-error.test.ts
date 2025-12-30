@@ -16,9 +16,8 @@ describe("defineError strict type testing", () => {
         const err = AppError.Unauthorized();
 
         if (isDefinedError(err)) {
-            const genericErr = err as AppErrorType;
-            expect(isDefinedError(genericErr)).toBe(true);
-            switch (genericErr.code) { // type auto infer
+            expect(isDefinedError(err)).toBe(true);
+            switch ((err as AppErrorType).code) { // type auto infer
                 case "DatabaseError":
                     expect(false).toBe(true);
                     throw new Error("Should not happen");
