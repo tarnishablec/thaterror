@@ -16,7 +16,7 @@ describe("defineError strict type testing", () => {
         expect(err.code).toBe("Unauthorized");
         expect(err.message).toBe("User is not logged in");
         expect(err[ErrorBrand]).toBe(true);
-        expect(err.payload).toBeUndefined();
+        expect(err.payloads).toBeUndefined();
     });
 
     test("error with parameters should correctly capture payload", () => {
@@ -25,8 +25,8 @@ describe("defineError strict type testing", () => {
         expect(err.code).toBe("NotFound");
         expect(err.message).toBe("Resource 404 not found");
         // Verify payload is a tuple [404]
-        expect(err.payload).toEqual([404]);
-        expect(err.payload[0]).toBe(404);
+        expect(err.payloads).toEqual([404]);
+        expect(err.payloads[0]).toBe(404);
     });
 
     test("should support native Error.cause (#[source])", () => {
@@ -61,7 +61,7 @@ describe("defineError strict type testing", () => {
 
             if (isDBError) {
                 expect(e.code).toBe("DatabaseError");
-                expect(err.payload).toEqual(["SELECT *"]);
+                expect(err.payloads).toEqual(["SELECT *"]);
             }
         }
     });
@@ -72,7 +72,7 @@ describe("defineError strict type testing", () => {
         // Mock switch-case logic
         if (err.code === "NotFound") {
             // Here IDE should automatically infer err.payload[0] is number
-            const id = err.payload[0];
+            const id = err.payloads[0];
             expect(id).toBe(1);
         }
     });

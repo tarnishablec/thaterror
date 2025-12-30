@@ -1,4 +1,4 @@
-# ferro
+# ferror
 
 To install dependencies:
 

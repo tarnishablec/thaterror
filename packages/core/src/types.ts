@@ -6,7 +6,7 @@ export interface DefinedError<
 > extends Error {
     readonly [ErrorBrand]: true;
     readonly code: Code;
-    readonly payload: Payload;
+    readonly payloads: Payload;
     readonly scope: symbol;
 }
 

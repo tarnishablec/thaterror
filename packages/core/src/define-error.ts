@@ -13,7 +13,7 @@ class InternalBaseError<C extends string, P> extends Error implements DefinedErr
 
     constructor(
         public readonly code: C,
-        public readonly payload: P,
+        public readonly payloads: P,
         readonly scope: symbol,
         message: string,
         options?: ErrorOptions
@@ -21,7 +21,7 @@ class InternalBaseError<C extends string, P> extends Error implements DefinedErr
         super(message, options);
         this.name = code;
         this.scope = scope;
-        this.payload = payload;
+        this.payloads = payloads;
         Object.setPrototypeOf(this, new.target.prototype);
     }
 }
