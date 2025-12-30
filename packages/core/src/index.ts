@@ -1,0 +1,1 @@
+export {defineError, is} from './define-error'
