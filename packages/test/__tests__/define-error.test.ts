@@ -1,6 +1,6 @@
 import {describe, expect, test} from "bun:test";
-import {defineError, is, isDefinedError} from "@ferror/core"
-import {ErrorBrand, type InferDefinedError} from "@ferror/core/types";
+import {defineError, is, isDefinedError, scopeOf} from "@ferror/core"
+import {ErrorBrand, type ErrorOf} from "@ferror/core/types";
 
 const AppError = defineError({
     NotFound: (id: number) => `Resource ${id} not found`,
@@ -8,22 +8,40 @@ const AppError = defineError({
     DatabaseError: (query: string) => `Query failed: ${query}`,
 });
 
-type AppErrorType = InferDefinedError<typeof AppError>;
+type AppErrorType = ErrorOf<typeof AppError>;
 
 describe("defineError strict type testing", () => {
 
     test("static error should be correctly generated", () => {
         const err = AppError.Unauthorized();
 
-        const genericErr = err as AppErrorType;
+        if (isDefinedError(err)) {
+            const genericErr = err as AppErrorType;
+            expect(isDefinedError(genericErr)).toBe(true);
+            switch (genericErr.code) { // type auto infer
+                case "DatabaseError":
+                    expect(false).toBe(true);
+                    throw new Error("Should not happen");
+                case "NotFound":
+                    expect(false).toBe(true);
+                    throw new Error("Should not happen");
+                case "Unauthorized":
+                    break;
+            }
 
-        expect(isDefinedError(genericErr)).toBe(true);
-
+        }
         expect(err.code).toBe("Unauthorized");
         expect(err.message).toBe("User is not logged in");
         expect(err[ErrorBrand]).toBe(true);
         expect(err.payloads).toBeUndefined();
     });
+
+    test("scope matching should work", () => {
+        const err = AppError.Unauthorized();
+        expect(err.scope).toBe(scopeOf(AppError));
+        expect(isDefinedError(err, scopeOf(AppError))).toBe(true);
+        expect(isDefinedError(err, Symbol())).toBe(false);
+    })
 
     test("error with parameters should correctly capture payload", () => {
         const err = AppError.NotFound(404);

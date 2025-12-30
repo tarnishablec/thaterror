@@ -1,8 +1,8 @@
 import {
     type DefinedError,
-    type DefinedErrorFactory,
     ErrorBrand,
-    type ErrorFactory,
+    type ErrorCase,
+    type ErrorFamily,
     type ErrorMap,
     type ErrorSpec
 } from "./types";
@@ -28,7 +28,7 @@ class InternalBaseError<C extends string, P> extends Error implements DefinedErr
 
 export function defineError<const M extends ErrorMap>(
     map: M
-): DefinedErrorFactory<M> {
+): ErrorFamily<M> {
     const result = {} as Record<string, unknown>;
     const scope = Symbol();
 
@@ -46,12 +46,15 @@ export function defineError<const M extends ErrorMap>(
             };
         }
 
-        const factory = result[key] as ErrorFactory<string, ErrorSpec>;
-
+        const factory = result[key] as ErrorCase<string, ErrorSpec>;
         Reflect.set(factory, "code", key);
         Reflect.set(factory, "scope", scope);
     }
 
-    return result as DefinedErrorFactory<M>;
+    Reflect.set(result, "scope", scope);
+    return result as ErrorFamily<M>;
 }
 
+export function scopeOf<M extends ErrorMap>(errorFamily: ErrorFamily<M>) {
+    return Reflect.get(errorFamily, "scope");
+}

@@ -10,10 +10,6 @@ export interface DefinedError<
     readonly scope: symbol;
 }
 
-
-export type Into<E> = (cause: unknown) => E;
-
-
 export type ErrorSpec =
     | string
     | ((...args: never[]) => string);
@@ -21,17 +17,18 @@ export type ErrorSpec =
 export type ErrorMap = Record<string, ErrorSpec>;
 
 
-export type ErrorFactory<K extends string, S extends ErrorSpec> =
+export type ErrorCase<K extends string, S extends ErrorSpec> =
     (S extends (...args: infer A) => string
         ? (...args: A) => DefinedError<K, A>
         : (options?: { cause?: unknown }) => DefinedError<K, void>)
     & { readonly code: K; readonly scope: symbol };
 
-export type DefinedErrorFactory<M extends ErrorMap> = {
-    readonly [K in keyof M & string]: ErrorFactory<K, M[K]>;
+export type ErrorFamily<M extends ErrorMap> = {
+    readonly [K in keyof M & string]: ErrorCase<K, M[K]>;
 };
 
-export type InferDefinedError<F> =
-    F extends Record<string, (...args: any[]) => infer R>
-        ? R
-        : never;
+
+export type ErrorOf<
+    F extends ErrorFamily<ErrorMap>
+> =
+    ReturnType<F[keyof F & string]>;
