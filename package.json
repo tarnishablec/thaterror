@@ -1,6 +1,5 @@
 {
   "name": "ferror",
-  "module": "index.ts",
   "private": true,
   "workspaces": [
     "packages/*"
