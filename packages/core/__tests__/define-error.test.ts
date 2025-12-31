@@ -8,7 +8,7 @@ import {
     PayloadField,
     ScopeField,
     scopeOf
-} from "thaterror"
+} from "@thaterror/core"
 
 export const AppError = defineError({
     NotFound: (id: number) => `Resource ${id} not found`,
