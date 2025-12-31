@@ -14,5 +14,12 @@ describe('ErrorFamily from native error testing', () => {
 
         const ExxAppError = ExAppError.enroll(HTTPException, AppError.NotFound, (e) => [e.status]);
         expect(ExxAppError.from(new HTTPException(404))).toBeInstanceOf(AppError.NotFound);
+
+        const ExrAppError = ExxAppError
+            .enroll(MyCustomError, AppError.NotFound, (_e) => [1])
+            .enroll(SyntaxError, AppError.ShardError, (_e) => [2, 'xx']);
+        expect(ExrAppError.from(new HTTPException(404))).toBeInstanceOf(AppError.NotFound);
+
+
     })
 })
