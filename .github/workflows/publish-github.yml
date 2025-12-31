@@ -47,25 +47,32 @@ jobs:
                 id: bump
                 run: |
                     set -euo pipefail
-                    BUMP_TYPE="${{ github.event.inputs.bump || 'patch' }}"
+
+                    # Read the workflow input (may be empty). Expand expression into shell var.
+                    BUMP_TYPE="${{ github.event.inputs.bump }}"
+
+                    # If input is empty or null, default to "patch".
+                    if [ -z "${BUMP_TYPE}" ] || [ "${BUMP_TYPE}" = "null" ]; then
+                      BUMP_TYPE="patch"
+                    fi
                     echo "Requested bump type: $BUMP_TYPE"
-    
+                    
                     # Use bun's builtin version command to bump root package.json
                     # --no-git-tag-version prevents creating a git tag; we will commit & push changes ourselves later.
                     if command -v bun >/dev/null 2>&1; then
-                    bun pm version "$BUMP_TYPE" --no-git-tag-version
+                      bun pm version "$BUMP_TYPE" --no-git-tag-version
                     else
-                    echo "bun not found in runner; aborting"
-                    exit 1
+                      echo "bun not found in runner; aborting"
+                      exit 1
                     fi
-                  
-                  # Read the new version from root package.json
+                    
+                    # Read the new version from root package.json
                     NEW=$(jq -r .version package.json)
                     if [ -z "$NEW" ] || [ "$NEW" = "null" ]; then
-                    echo "Failed to read new version from package.json"
-                    exit 1
+                      echo "Failed to read new version from package.json"
+                      exit 1
                     fi
-    
+                    
                     echo "Bumped version: $NEW"
                     echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
                     echo "NEW_VERSION=$NEW" >> $GITHUB_ENV
