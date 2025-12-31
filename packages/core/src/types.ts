@@ -62,7 +62,35 @@ export type ErrorFamily<M extends ErrorMap, Es extends readonly (readonly [Error
             : [transformer: (e: E) => ExtractPayload<M[K]>]
     ): ErrorFamily<M, Upsert<Es, E, C>>;
 
-    from<E extends Es[number][0]>(error: E): Extract<Es[number], readonly [E, unknown]>[1];
+    /**
+     * Identifies and transforms a raw Error into a typed family variant.
+     * * WHY THE COMPLEX LOGIC?
+     * 1. Structural vs. Nominal: TS is structural. Two different classes with the same
+     * properties (like empty Errors) are seen as the same type.
+     * 2. Distributive Identity Check: We use `true extends (Es[number][0] extends infer U ...)`
+     * to iterate over the enrolled types. For each type `U`, we perform a
+     * bidirectional 'extends' check: `[E] extends [U]` AND `[U] extends [E]`.
+     * 3. Result: This ensures that only the EXACT class enrolled can pass.
+     * Subclasses or base Error classes that were not explicitly enrolled
+     * will trigger the `{ __STATUS__: "NOT_ENROLLED" }` type mismatch.
+     */
+    from<E extends Error>(
+        error: E & (
+            [NoInfer<E>] extends [Es[number][0]]
+                ? (
+                    true extends (
+                            Es[number][0] extends infer U
+                                ? (U extends Error
+                                    ? ([E] extends [U] ? ([U] extends [E] ? true : never) : never)
+                                    : never)
+                                : never
+                            )
+                        ? unknown
+                        : { __STATUS__: "ERROR_NOT_ENROLLED"; message: "This specific error class was not registered" }
+                    )
+                : { __STATUS__: "TYPE_NOT_ENROLLED"; message: "Type structure not found in family" }
+            )
+    ): Extract<Es[number], readonly [E, unknown]>[1];
 };
 
 /**

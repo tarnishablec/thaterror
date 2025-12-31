@@ -3,8 +3,14 @@ import { HTTPException } from 'hono/http-exception'
 import { AppError } from './define-error.test'
 
 class MyCustomError extends Error {
+    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: <test>
+    #prop = 1;
 }
 
+class MyCustomError2 extends Error {
+    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: <test>
+    #prop2 = 1;
+}
 
 describe('ErrorFamily from native error testing', () => {
     test('should chain up error family', () => {
@@ -20,6 +26,7 @@ describe('ErrorFamily from native error testing', () => {
             .enroll(SyntaxError, AppError.ShardError, (_e) => [2, 'xx']);
         expect(ExrAppError.from(new HTTPException(404))).toBeInstanceOf(AppError.NotFound);
 
-
+        // @ts-expect-error
+        expect(ExrAppError.from(new MyCustomError2())).toBeInstanceOf(AppError.ShardError);
     })
 })
