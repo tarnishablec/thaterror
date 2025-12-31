@@ -18,5 +18,8 @@
     },
     "devDependencies": {
         "hono": "^4.11.3"
+    },
+    "publishConfig": {
+        "access": "public"
     }
 }
