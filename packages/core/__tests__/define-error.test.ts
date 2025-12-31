@@ -18,7 +18,7 @@ export const AppError = defineError({
     ShardError: (characterId: number, shard: string) => `Character & shard unmatch ${characterId} : ${shard}`
 });
 
-export type AppErrorType = ErrorUnionOf<typeof AppError>;
+export type AppErrorUnion = ErrorUnionOf<typeof AppError>;
 
 describe("defineError strict type testing", () => {
 
@@ -35,7 +35,7 @@ describe("defineError strict type testing", () => {
 
         if (isDefinedError(err, scopeOf(AppError))) {
             expect(isDefinedError(err, scopeOf(AppError))).toBe(true);
-            switch ((err as AppErrorType)[CodeField]) { // type auto infer
+            switch ((err as AppErrorUnion)[CodeField]) { // type auto infer
                 case "DatabaseError":
                     expect(false).toBe(true);
                     throw new Error("Should not happen");

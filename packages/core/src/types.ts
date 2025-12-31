@@ -42,7 +42,7 @@ export type ErrorFamily<M extends ErrorMap, Es extends readonly (readonly [Error
     readonly [K in keyof M & string]: ErrorCase<K, M[K]>;
 } & {
     readonly [ScopeField]: symbol;
-
+} & {
     /**
      * Registers an Error class into the family mapping it to a specific variant.
      * ### 🧬 TYPE CAPTURE
