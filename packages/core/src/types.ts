@@ -44,10 +44,22 @@ export type ErrorFamily<M extends ErrorMap, Es extends readonly (readonly [Error
     readonly [ScopeField]: symbol;
 
     /**
-     * Enrolls an Error class into the family and associates it with an error case.
-     * @param errorClass The constructor of the error (e.g., SyntaxError or a custom class).
-     * @param errorCase The variant case from this family.
-     * @param args A transformer is REQUIRED if the error case expects a payload.
+     * Registers an Error class into the family mapping it to a specific variant.
+     * ### 🧬 TYPE CAPTURE
+     * 1. **Class to Instance**: Extracts the precise instance type `E` from the constructor `T`.
+     * This handles built-in types (like `SyntaxError`) and custom classes correctly.
+     * 2. **State Propagation**: Updates the internal tuple `Es` to track the mapping
+     * between the Error class and its corresponding Case return type.
+     * ### 🚀 TRANSFORMER LOGIC
+     * 1) **Automatic**: If the target Case (e.g., `AppError.Unauthorized`) requires no payload,
+     * the third argument is omitted.
+     * 2) **Enforced**: If the Case requires a payload (e.g., `[id: string]`), you **MUST** * provide a transformer function `(e: E) => Payload` to bridge the data.
+     *
+     *
+     * @param errorClass - The constructor of the error (e.g., `MyCustomError` or `TypeError`).
+     * @param errorCase - The family variant this error should map to.
+     * @param args - Conditional transformer based on the case's payload requirement.
+     * @returns A new `ErrorFamily` instance with an updated type-safe registry.
      */
     enroll<
         T extends { new(...args: never[]): Error; readonly prototype: Error },
@@ -63,16 +75,24 @@ export type ErrorFamily<M extends ErrorMap, Es extends readonly (readonly [Error
     ): ErrorFamily<M, Upsert<Es, E, C>>;
 
     /**
-     * Identifies and transforms a raw Error into a typed family variant.
-     * * WHY THE COMPLEX LOGIC?
-     * 1. Structural vs. Nominal: TS is structural. Two different classes with the same
-     * properties (like empty Errors) are seen as the same type.
-     * 2. Distributive Identity Check: We use `true extends (Es[number][0] extends infer U ...)`
-     * to iterate over the enrolled types. For each type `U`, we perform a
-     * bidirectional 'extends' check: `[E] extends [U]` AND `[U] extends [E]`.
-     * 3. Result: This ensures that only the EXACT class enrolled can pass.
-     * Subclasses or base Error classes that were not explicitly enrolled
-     * will trigger the `{ __STATUS__: "NOT_ENROLLED" }` type mismatch.
+     * Identifies and transforms a raw Error instance into its associated typed case.
+     * ### 🧠 WHY THE COMPLEX LOGIC?
+     * 1. **Structural vs. Nominal Typing**:
+     * TypeScript is structural. Two different classes with identical shapes (like two
+     * empty classes extending Error) are treated as the exact same type.
+     * 2. **Distributive Identity Matching**:
+     * We use `true extends (Es[number][0] extends infer U ...)` to force TS to iterate
+     * over each enrolled type `U` individually. The bidirectional check `[E] extends [U]`
+     * AND `[U] extends [E]` ensures that `E` and `U` are structurally identical.
+     * 3. **The "Empty Class" Caveat**:
+     * If you have `class A extends Error {}` and `class B extends Error {}`, they will
+     * both satisfy the identity check because they share the same shape. To enforce
+     * strict differentiation (Nominal Typing), add a private member or a brand:
+     * `class MyError extends Error { #brand: unknown }`.
+     * ### 🛠️ RETURN BEHAVIOR
+     * - Returns the specific `ErrorCase` return value if the class is enrolled.
+     * - Triggers a compilation error (`NOT_ENROLLED`) if the error class identity
+     * does not match the registered set.
      */
     from<E extends Error>(
         error: E & (

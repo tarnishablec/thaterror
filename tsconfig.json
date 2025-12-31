@@ -22,7 +22,8 @@
         "noUnusedLocals": false,
         "noUnusedParameters": false,
         "noPropertyAccessFromIndexSignature": false,
-        "strictFunctionTypes": true
+        "strictFunctionTypes": true,
+        "useDefineForClassFields": true
     },
     "include": [
         "packages/**/*.ts"
