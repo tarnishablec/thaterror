@@ -11,17 +11,17 @@ describe('ErrorFamily from native error testing', () => {
     test('should chain up error family', () => {
         const family = enroll(
             AppError, HTTPException, (e) => {
-                return AppError.NotFound(1, { cause: e })
+                return AppError.NotFound(1, {cause: e})
             })
 
-        const httpException = new HTTPException(404, { message: 'Not Found' })
+        const httpException = new HTTPException(404, {message: 'Not Found'})
         const err = family.from(httpException);
         expect(err.cause).toBe(httpException)
 
 
         const exFamily = enroll(
             family, MyCustomError, (e) => {
-                return family.Unauthorized({ cause: e })
+                return family.Unauthorized({cause: e})
             });
 
         expect(exFamily.from(new MyCustomError()).cause).toBeInstanceOf(MyCustomError)

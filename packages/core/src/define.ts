@@ -10,10 +10,10 @@ import {
 
 
 class InternalBaseError<const Code extends string, const Payloads extends readonly unknown[]> extends Error implements DefinedError<Code, Payloads> {
-    readonly [ ErrorBrand ] = true as const;
-    readonly [ ScopeField ]: symbol;
-    readonly [ PayloadField ]: Payloads;
-    readonly [ CodeField ]: Code;
+    readonly [ErrorBrand] = true as const;
+    readonly [ScopeField]: symbol;
+    readonly [PayloadField]: Payloads;
+    readonly [CodeField]: Code;
 
     constructor(
         public readonly code: Code,
@@ -24,9 +24,11 @@ class InternalBaseError<const Code extends string, const Payloads extends readon
     ) {
         super(message, options);
         this.name = code;
-        this[ CodeField ] = code;
-        this[ ScopeField ] = scope;
-        this[ PayloadField ] = args;
+        this[CodeField] = code;
+        this[ScopeField] = scope;
+        this[PayloadField] = args;
+
+        Error.captureStackTrace(this, this.constructor);
     }
 }
 
@@ -37,7 +39,7 @@ export function defineError<const M extends ErrorMap>(
     const scope = Symbol();
 
     for (const key in map) {
-        const spec = map[ key ];
+        const spec = map[key];
 
         const factory = (...args: unknown[]) => {
             let finalArgs = args;
@@ -45,7 +47,7 @@ export function defineError<const M extends ErrorMap>(
 
             if (typeof spec === "function") {
                 if (args.length > spec.length) {
-                    const lastArg = args[ args.length - 1 ];
+                    const lastArg = args[args.length - 1];
                     if (typeof lastArg === "object" && lastArg !== null) {
                         options = lastArg as ErrorOptions;
                         finalArgs = args.slice(0, -1);
@@ -57,7 +59,7 @@ export function defineError<const M extends ErrorMap>(
             }
 
             if (typeof spec === "string") {
-                options = args[ 0 ] as ErrorOptions | undefined;
+                options = args[0] as ErrorOptions | undefined;
                 return new InternalBaseError(key, [], scope, spec, options);
             }
         };
@@ -65,7 +67,7 @@ export function defineError<const M extends ErrorMap>(
         Reflect.set(factory, CodeField, key);
         Reflect.set(factory, ScopeField, scope);
 
-        result[ key ] = factory;
+        result[key] = factory;
     }
 
     Reflect.set(result, ScopeField, scope);
