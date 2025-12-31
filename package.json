@@ -1,9 +1,9 @@
 {
-    "name": "thaterror",
+    "name": "thaterror-workspace",
     "private": true,
     "version": "0.1.0",
     "workspaces": [
-        "packages/core"
+        "packages/*"
     ],
     "type": "module",
     "devDependencies": {
