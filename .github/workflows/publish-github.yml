@@ -1,0 +1,141 @@
+name: Bump versions and publish packages/core
+
+on:
+    workflow_dispatch:
+        inputs:
+            bump:
+                description: 'Which semver part to bump'
+                required: false
+                default: 'patch'
+                type: choice
+                options:
+                    - major
+                    - minor
+                    - patch
+
+permissions:
+    contents: write    # for committing & pushing version changes
+    packages: write    # for publishing to GitHub Packages
+
+jobs:
+    bump-and-publish:
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v6
+                with:
+                    fetch-depth: 0
+                    persist-credentials: true
+
+            -   name: Setup bun
+                uses: oven-sh/setup-bun@v2
+                with:
+                    bun-version: 'latest'   # 或指定具体版本
+
+            -   name: Show bun versions
+                run: |
+                    bun --version 
+
+            -   name: Validate root package.json exists
+                run: |
+                    if [ ! -f package.json ]; then
+                      echo "Root package.json not found"
+                      exit 1
+                    fi
+
+            -   name: Determine current version and bump
+                id: bump
+                run: |
+                    set -euo pipefail
+                    BUMP_TYPE="${{ github.event.inputs.bump || 'patch' }}"
+                    echo "Requested bump type: $BUMP_TYPE"
+    
+                    # Use bun's builtin version command to bump root package.json
+                    # --no-git-tag-version prevents creating a git tag; we will commit & push changes ourselves later.
+                    if command -v bun >/dev/null 2>&1; then
+                    bun pm version "$BUMP_TYPE" --no-git-tag-version
+                    else
+                    echo "bun not found in runner; aborting"
+                    exit 1
+                    fi
+                  
+                  # Read the new version from root package.json
+                    NEW=$(jq -r .version package.json)
+                    if [ -z "$NEW" ] || [ "$NEW" = "null" ]; then
+                    echo "Failed to read new version from package.json"
+                    exit 1
+                    fi
+    
+                    echo "Bumped version: $NEW"
+                    echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
+                    echo "NEW_VERSION=$NEW" >> $GITHUB_ENV
+
+            -   name: Propagate new version to all packages/*/package.json
+                run: |
+                    set -euo pipefail
+                    echo "Propagating version $NEW_VERSION to packages/*/package.json"
+                    for P in packages/*; do
+                      if [ -f "$P/package.json" ]; then
+                        jq --arg v "$NEW_VERSION" '.version = $v' "$P/package.json" > "$P/package.json.tmp"
+                        mv "$P/package.json.tmp" "$P/package.json"
+                        echo "Updated $P/package.json -> $(jq -r .version "$P/package.json")"
+                      fi
+                    done
+
+            -   name: Commit and push version changes
+                env:
+                    GIT_AUTHOR_NAME: github-actions
+                    GIT_AUTHOR_EMAIL: github-actions@users.noreply.github.com
+                run: |
+                    set -euo pipefail
+                    # ensure git is configured
+                    git config user.name "${GIT_AUTHOR_NAME}"
+                    git config user.email "${GIT_AUTHOR_EMAIL}"
+                    
+                    # detect any changes
+                    if git status --porcelain | grep -q . ; then
+                      BRANCH="bump-version/${NEW_VERSION}"
+                      echo "Creating branch $BRANCH and committing changes"
+                      git checkout -b "$BRANCH"
+                      git add package.json || true
+                      git add packages/*/package.json || true
+                      git commit -m "chore(release): bump version to ${NEW_VERSION} [skip ci]"
+                      git push --set-upstream origin "$BRANCH"
+                      echo "Pushed version bump to origin/$BRANCH"
+                      echo "PUSHED_BRANCH=$BRANCH" >> $GITHUB_ENV
+                    else
+                      echo "No changes to commit"
+                    fi
+
+            -   name: Validate packages/core package.json
+                run: |
+                    set -euo pipefail
+                    if [ ! -f packages/core/package.json ]; then
+                      echo "Error: packages/core/package.json not found"
+                      exit 1
+                    fi
+                    if jq -e '.private == true' packages/core/package.json >/dev/null 2>&1; then
+                      echo "packages/core is marked private; cannot publish"
+                      exit 1
+                    fi
+                    echo "packages/core ready to publish (version: $(jq -r .version packages/core/package.json))"
+
+            -   name: Publish packages/core (no build; using NODE_AUTH_TOKEN)
+                env:
+                    NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    set -euo pipefail
+                    cd packages/core
+                    echo "Publishing from: $(pwd)"
+                    echo "Package name: $(jq -r .name package.json)"
+                    echo "Package version: $(jq -r .version package.json)"
+                    if command -v bun >/dev/null 2>&1 ; then
+                      echo "Attempting bun publish..."
+                      bun publish --registry=https://npm.pkg.github.com || {
+                        echo "bun publish failed; attempting npm publish fallback"
+                        npm publish --registry=https://npm.pkg.github.com
+                      }
+                    else
+                      echo "bun not found; using npm publish"
+                      npm publish --registry=https://npm.pkg.github.com
+                    fi
