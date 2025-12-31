@@ -106,7 +106,7 @@ export type ErrorFamily<M extends ErrorMap, Es extends readonly (readonly [Error
                                 : never
                             )
                         ? unknown
-                        : { __STATUS__: "ERROR_NOT_ENROLLED"; message: "This specific error class was not registered" }
+                        : { __STATUS__: "ERROR_NOT_ENROLLED"; message: "This specific error class was not enrolled" }
                     )
                 : { __STATUS__: "TYPE_NOT_ENROLLED"; message: "Type structure not found in family" }
             )
