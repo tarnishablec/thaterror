@@ -12,6 +12,11 @@ on:
                     - major
                     - minor
                     - patch
+            package:
+                description: 'Which package to publish (name under packages/). Use "all" to publish all packages. Default: core'
+                required: false
+                default: 'core'
+                type: string
 
 permissions:
     contents: write    # for committing & pushing version changes
@@ -21,128 +26,166 @@ jobs:
     bump-and-publish:
         runs-on: ubuntu-latest
         steps:
-            -   name: Checkout
-                uses: actions/checkout@v6
-                with:
-                    fetch-depth: 0
-                    persist-credentials: true
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+                  persist-credentials: true
 
-            -   name: Setup bun
-                uses: oven-sh/setup-bun@v2
-                with:
-                    bun-version: 'latest'   # 或指定具体版本
+            - name: Setup bun
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: 'latest'
 
-            -   name: Show bun versions
-                run: |
-                    bun --version 
+            - name: Show bun versions
+              run: |
+                  bun --version || true
 
-            -   name: Validate root package.json exists
-                run: |
-                    if [ ! -f package.json ]; then
-                      echo "Root package.json not found"
-                      exit 1
+            - name: Validate root package.json exists
+              run: |
+                  if [ ! -f package.json ]; then
+                    echo "Root package.json not found"
+                    exit 1
+                  fi
+
+            - name: Determine current version and bump
+              id: bump
+              run: |
+                  set -euo pipefail
+                  
+                  # Read the workflow input (expanded by GH). Use shell default if empty/null.
+                  BUMP_TYPE="${{ github.event.inputs.bump }}"
+                  if [ -z "${BUMP_TYPE}" ] || [ "${BUMP_TYPE}" = "null" ]; then
+                    BUMP_TYPE="patch"
+                  fi
+                  echo "Requested bump type: $BUMP_TYPE"
+                  
+                  # Use bun's version command to bump root package.json (no git tag)
+                  if command -v bun >/dev/null 2>&1; then
+                    bun pm version "$BUMP_TYPE" --no-git-tag-version
+                  else
+                    echo "bun not found in runner; aborting"
+                    exit 1
+                  fi
+                  
+                  # Read the new version from root package.json
+                  NEW=$(jq -r .version package.json)
+                  if [ -z "$NEW" ] || [ "$NEW" = "null" ]; then
+                    echo "Failed to read new version from package.json"
+                    exit 1
+                  fi
+                  
+                  echo "Bumped version: $NEW"
+                  echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
+                  echo "NEW_VERSION=$NEW" >> $GITHUB_ENV
+
+            - name: Propagate new version to all packages/*/package.json
+              run: |
+                  set -euo pipefail
+                  echo "Propagating version $NEW_VERSION to packages/*/package.json"
+                  for P in packages/*; do
+                    if [ -f "$P/package.json" ]; then
+                      jq --arg v "$NEW_VERSION" '.version = $v' "$P/package.json" > "$P/package.json.tmp"
+                      mv "$P/package.json.tmp" "$P/package.json"
+                      echo "Updated $P/package.json -> $(jq -r .version "$P/package.json")"
                     fi
+                  done
 
-            -   name: Determine current version and bump
-                id: bump
-                run: |
-                    set -euo pipefail
+            - name: Commit and push version changes
+              env:
+                  GIT_AUTHOR_NAME: github-actions
+                  GIT_AUTHOR_EMAIL: github-actions@users.noreply.github.com
+              run: |
+                  set -euo pipefail
+                  git config user.name "${GIT_AUTHOR_NAME}"
+                  git config user.email "${GIT_AUTHOR_EMAIL}"
+                  
+                  if git status --porcelain | grep -q . ; then
+                    BRANCH="bump-version/${NEW_VERSION}"
+                    echo "Creating branch $BRANCH and committing changes"
+                    git checkout -b "$BRANCH"
+                    git add package.json || true
+                    git add packages/*/package.json || true
+                    git commit -m "chore(release): bump version to ${NEW_VERSION} [skip ci]"
+                    git push --set-upstream origin "$BRANCH"
+                    echo "Pushed version bump to origin/$BRANCH"
+                    echo "PUSHED_BRANCH=$BRANCH" >> $GITHUB_ENV
+                  else
+                    echo "No changes to commit"
+                  fi
 
-                    # Read the workflow input (may be empty). Expand expression into shell var.
-                    BUMP_TYPE="${{ github.event.inputs.bump }}"
+            - name: Validate packages/core package.json
+              run: |
+                  set -euo pipefail
+                  if [ ! -f packages/core/package.json ]; then
+                    echo "Warning: packages/core/package.json not found (this workflow supports publishing other packages too)"
+                  fi
 
-                    # If input is empty or null, default to "patch".
-                    if [ -z "${BUMP_TYPE}" ] || [ "${BUMP_TYPE}" = "null" ]; then
-                      BUMP_TYPE="patch"
+            - name: Configure npm for GitHub Packages (for bun publish auth)
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  echo "Configuring npm for GitHub Packages (token is NOT printed)"
+                  # Write auth token and scope registry mapping into ~/.npmrc
+                  printf "//npm.pkg.github.com/:_authToken=%s\n" "${NODE_AUTH_TOKEN}" > ~/.npmrc
+                  printf "@%s:registry=https://npm.pkg.github.com/\n" "${{ github.repository_owner }}" >> ~/.npmrc
+                  printf "always-auth=true\n" >> ~/.npmrc
+                  # Show the non-sensitive parts of the file to confirm (hide _authToken line)
+                  echo "---- ~/.npmrc (non-sensitive lines) ----"
+                  grep -v '_authToken' ~/.npmrc || true
+                  echo "---- end ----"
+
+            - name: Publish selected package(s) with bun (fallback to npm if needed)
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  
+                  PKG_INPUT="${{ github.event.inputs.package }}"
+                  if [ -z "${PKG_INPUT}" ] || [ "${PKG_INPUT}" = "null" ]; then
+                    PKG_INPUT="core"
+                  fi
+                  echo "Requested package to publish: ${PKG_INPUT}"
+                  
+                  publish_dir() {
+                    D="$1"
+                    if [ ! -f "$D/package.json" ]; then
+                      echo "Skipping $D: package.json not found"
+                      return 1
                     fi
-                    echo "Requested bump type: $BUMP_TYPE"
-                    
-                    # Use bun's builtin version command to bump root package.json
-                    # --no-git-tag-version prevents creating a git tag; we will commit & push changes ourselves later.
-                    if command -v bun >/dev/null 2>&1; then
-                      bun pm version "$BUMP_TYPE" --no-git-tag-version
-                    else
-                      echo "bun not found in runner; aborting"
-                      exit 1
+                    if jq -e '.private == true' "$D/package.json" >/dev/null 2>&1; then
+                      echo "Skipping $D: marked private"
+                      return 0
                     fi
-                    
-                    # Read the new version from root package.json
-                    NEW=$(jq -r .version package.json)
-                    if [ -z "$NEW" ] || [ "$NEW" = "null" ]; then
-                      echo "Failed to read new version from package.json"
-                      exit 1
-                    fi
-                    
-                    echo "Bumped version: $NEW"
-                    echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
-                    echo "NEW_VERSION=$NEW" >> $GITHUB_ENV
-
-            -   name: Propagate new version to all packages/*/package.json
-                run: |
-                    set -euo pipefail
-                    echo "Propagating version $NEW_VERSION to packages/*/package.json"
-                    for P in packages/*; do
-                      if [ -f "$P/package.json" ]; then
-                        jq --arg v "$NEW_VERSION" '.version = $v' "$P/package.json" > "$P/package.json.tmp"
-                        mv "$P/package.json.tmp" "$P/package.json"
-                        echo "Updated $P/package.json -> $(jq -r .version "$P/package.json")"
-                      fi
-                    done
-
-            -   name: Commit and push version changes
-                env:
-                    GIT_AUTHOR_NAME: github-actions
-                    GIT_AUTHOR_EMAIL: github-actions@users.noreply.github.com
-                run: |
-                    set -euo pipefail
-                    # ensure git is configured
-                    git config user.name "${GIT_AUTHOR_NAME}"
-                    git config user.email "${GIT_AUTHOR_EMAIL}"
-                    
-                    # detect any changes
-                    if git status --porcelain | grep -q . ; then
-                      BRANCH="bump-version/${NEW_VERSION}"
-                      echo "Creating branch $BRANCH and committing changes"
-                      git checkout -b "$BRANCH"
-                      git add package.json || true
-                      git add packages/*/package.json || true
-                      git commit -m "chore(release): bump version to ${NEW_VERSION} [skip ci]"
-                      git push --set-upstream origin "$BRANCH"
-                      echo "Pushed version bump to origin/$BRANCH"
-                      echo "PUSHED_BRANCH=$BRANCH" >> $GITHUB_ENV
-                    else
-                      echo "No changes to commit"
-                    fi
-
-            -   name: Validate packages/core package.json
-                run: |
-                    set -euo pipefail
-                    if [ ! -f packages/core/package.json ]; then
-                      echo "Error: packages/core/package.json not found"
-                      exit 1
-                    fi
-                    if jq -e '.private == true' packages/core/package.json >/dev/null 2>&1; then
-                      echo "packages/core is marked private; cannot publish"
-                      exit 1
-                    fi
-                    echo "packages/core ready to publish (version: $(jq -r .version packages/core/package.json))"
-
-            -   name: Publish packages/core (no build; using NODE_AUTH_TOKEN)
-                env:
-                    NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                run: |
-                    set -euo pipefail
-                    cd packages/core
-                    echo "Publishing from: $(pwd)"
-                    echo "Package name: $(jq -r .name package.json)"
-                    echo "Package version: $(jq -r .version package.json)"
+                    pushd "$D" >/dev/null
+                    NAME=$(jq -r .name package.json)
+                    VER=$(jq -r .version package.json)
+                    echo "Publishing $NAME@$VER from $D"
                     if command -v bun >/dev/null 2>&1 ; then
-                      echo "Attempting bun publish..."
                       bun publish --registry=https://npm.pkg.github.com || {
-                        echo "bun publish failed; attempting npm publish fallback"
+                        echo "bun publish failed for $D; attempting npm publish fallback"
                         npm publish --registry=https://npm.pkg.github.com
                       }
                     else
                       echo "bun not found; using npm publish"
                       npm publish --registry=https://npm.pkg.github.com
                     fi
+                    popd >/dev/null
+                  }
+                  
+                  if [ "${PKG_INPUT}" = "all" ]; then
+                    echo "Publishing all packages under packages/*"
+                    for D in packages/*; do
+                      if [ -d "$D" ]; then
+                        publish_dir "$D" || true
+                      fi
+                    done
+                  else
+                    TARGET="packages/${PKG_INPUT}"
+                    if [ ! -d "${TARGET}" ]; then
+                      echo "Error: target package directory ${TARGET} not found"
+                      exit 1
+                    fi
+                    publish_dir "${TARGET}"
+                  fi
