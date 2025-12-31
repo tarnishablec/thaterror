@@ -70,7 +70,7 @@ export type ErrorFamily<M extends ErrorMap, Es extends readonly (readonly [Error
  *
  * WHY THIS IS NECESSARY:
  *
- * Standard inference like `E extends Error` fails for built-in error types such as:
+ * Standard inference like `E extends Error` fails for built-in error types such as
  * - SyntaxError
  * - TypeError
  * - RangeError
