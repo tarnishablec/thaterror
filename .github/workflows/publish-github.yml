@@ -141,24 +141,23 @@ jobs:
                     fi
                   fi
 
-            - name: Configure npm for npmjs.org (for bun publish auth)
-              env:
-                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-              run: |
-                  set -euo pipefail
-                  if [ -z "${NPM_TOKEN:-}" ]; then
-                    echo "Error: secrets.NPM_TOKEN is not set. Add your npm publish token to repository secrets as NPM_TOKEN."
-                    exit 1
-                  fi
-                  echo "Configuring npm for npmjs.org (token is NOT printed)"
-                  # Use npm config to set auth (writes to ~/.npmrc)
-                  npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
-                  npm config set always-auth true
-                  # Show non-sensitive config for verification
-                  echo "---- npm config (non-sensitive) ----"
-                  npm config get registry || true
-                  npm config list | sed -n '1,200p' | sed 's/:_authToken=.*/:_authToken=*****/g' || true
-                  echo "---- end ----"
+            -   name: Configure npm for npmjs.org (for bun publish auth)
+                env:
+                    NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+                run: |
+                    set -euo pipefail
+                    if [ -z "${NPM_TOKEN:-}" ]; then
+                      echo "Error: secrets.NPM_TOKEN is not set. Add your npm publish token to repository secrets as NPM_TOKEN."
+                      exit 1
+                    fi
+                    echo "Configuring npm for npmjs.org (token is NOT printed)"
+                    # Write auth token and default registry into ~/.npmrc (used by npm and bun)
+                    printf "//registry.npmjs.org/:_authToken=%s\n" "${NPM_TOKEN}" > ~/.npmrc
+                    printf "registry=https://registry.npmjs.org/\n" >> ~/.npmrc
+                    # show non-sensitive confirmation (hide token)
+                    echo "---- ~/.npmrc (non-sensitive preview) ----"
+                    grep -v '_authToken' ~/.npmrc || true
+                    echo "---- end ----"
 
             - name: Publish selected package(s) with bun (fallback to npm if needed)
               env:
