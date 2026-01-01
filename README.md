@@ -10,23 +10,30 @@
 
 [//]: # (![GitHub commit activity]&#40;https://img.shields.io/github/commit-activity/m/tarnishablec/thaterror&#41;)
 
-A type-safe error handling library for TypeScript, heavily inspired by the experience of Rust's [thiserror](https://github.com/dtolnay/thiserror). It aims to remove the boilerplate while providing a seamless, domain-driven error management workflow.
+A type-safe error handling library for TypeScript, heavily inspired by the experience of
+Rust's [thiserror](https://github.com/dtolnay/thiserror). It aims to remove the boilerplate while providing a seamless,
+domain-driven error management workflow.
 
 ## The Core Value
 
 Handling `Error` in large-scale TypeScript projects can be frustrating:
+
 - `instanceof` is not always reliable across different packages, multiple versions, or due to structural typing matches.
 - Error context (Payload) is often lost during propagation.
-- Integrating third-party errors (e.g., `Hono`, `TypeORM`, `SyntaxError`) into your domain model usually requires messy manual conversion.
+- Integrating third-party errors (e.g., `Hono`, `TypeORM`, `SyntaxError`) into your domain model usually requires messy
+  manual conversion.
 
-`thaterror` solves these with a **Schema-first** philosophy, bringing **Rust-like ergonomics** to TypeScript error handling.
+`thaterror` solves these with a **Schema-first** philosophy, bringing **Rust-like ergonomics** to TypeScript error
+handling.
 
 ## ✨ Features
 
-- **🎯 Zero Boilerplate**: A single `defineError` call generates error factories with built-in type guards and payload support.
+- **🎯 Zero Boilerplate**: A single `defineError` call generates error factories with built-in type guards and payload
+  support.
 - **🏗️ Domain-Driven**: Define error families that encapsulate your business logic.
 - **🌉 Native Integration**: "Naturalize" external errors into your family using `enroll` and `bridge`.
-- **🧠 Intelligent Transformation**: The `from` method provides strict type checking, ensuring only registered error types are processed.
+- **🧠 Intelligent Transformation**: The `from` method provides strict type checking, ensuring only registered error
+  types are processed.
 - **🦾 Total Type Safety**: Perfect type narrowing that automatically infers payload types from your schema.
 - **🦀 thiserror-like Experience**: Declarative, robust, and designed for developers who value type correctness.
 
@@ -40,7 +47,8 @@ npm install @thaterror/core
 
 ## 🚀 Quick Start
 
-The best practice is to centralize your error definitions in a file (e.g., `errors.ts`), configure external error mappings using `enroll`, and export the resulting family.
+The best practice is to centralize your error definitions in a file (e.g., `errors.ts`), configure external error
+mappings using `enroll`, and export the resulting family.
 
 ### 1. Define and Configure (`errors.ts`)
 
@@ -78,7 +86,8 @@ This is where `thaterror` shines—bringing external error classes into your typ
 
 ### `enroll` (One-to-One Mapping)
 
-Maps a specific error class directly to a family case. If the case requires a payload, a transformer function must be provided.
+Maps a specific error class directly to a family case. If the case requires a payload, a transformer function must be
+provided.
 
 ```typescript
 import {AppError} from "./errors";
@@ -118,7 +127,8 @@ const MyFamily = AppError.bridge(HTTPException, (e, cases) => {
 
 ### `from` (The Type-Safe Gateway)
 
-`from` ensures that you only attempt to transform error types that you have explicitly registered. If an unenrolled error is passed, the TypeScript compiler will flag it.
+`from` ensures that you only attempt to transform error types that you have explicitly registered. If an unenrolled
+error is passed, the TypeScript compiler will flag it.
 
 ```typescript
 try {
@@ -139,10 +149,13 @@ try {
 
 ### Overcoming Structural Typing
 
-In TypeScript, two different classes with the same members are considered identical. This makes traditional `instanceof` checks brittle in certain architectural setups.
+In TypeScript, two different classes with the same members are considered identical. This makes traditional `instanceof`
+checks brittle in certain architectural setups.
 
-`thaterror` implements **Nominal Typing** via internal `Scope` symbols and advanced type gymnastics. Even if two errors look identical structurally, `thaterror` distinguishes them based on their registration and scope, providing much-needed reliability in complex apps.
+`thaterror` implements **Nominal Typing** via internal `Scope` symbols and advanced type gymnastics. Even if two errors
+look identical structurally, `thaterror` distinguishes them based on their registration and scope, providing much-needed
+reliability in complex apps.
 
 ## 📜 License
 
-MPL-2.0
+[MPL-2.0](https://github.com/tarnishablec/thaterror/blob/main/LICENSE)
