@@ -187,20 +187,6 @@ export type ErrorUnionOf<F> =
  * ```ts
  * type ErrType = ThatError<typeof AppError>;
  * ```
- *
- * @example
- * ### USE CASE: Integration with neverthrow
- * ```ts
- * function fetchData(): ResultAsync<string, ThatError<typeof AppError, 'Timeout' | 'Network'>> {
- * return fromPromise(
- * api.get('/data'),
- * (e: unknown) => AppError.bridge(e as Error, (err, cases) => {
- * if (err.message.includes('timeout')) return cases.Timeout();
- * return cases.Network();
- * }) as ThatError<typeof AppError, 'Timeout' | 'Network'>
- * );
- * }
- * ```
  */
 export type ThatError<
     F,
