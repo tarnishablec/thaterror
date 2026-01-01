@@ -1,4 +1,4 @@
-import { type DefinedError, type ErrorCase, type ErrorFamily, ScopeField } from "./types";
+import { type DefinedError, type ErrorCase, type ErrorFamily, PayloadField, ScopeField } from "./types";
 
 export interface Scoped {
     readonly [ScopeField]: symbol;
@@ -13,6 +13,9 @@ export function scopeOf<F>(
 ): symbol;
 
 export function scopeOf(target: Scoped): symbol {
-    return (target)[ScopeField];
+    return target[ScopeField];
+}
 
+export function payloadOf<E extends DefinedError>(error: E): E[typeof PayloadField] {
+    return error[PayloadField];
 }

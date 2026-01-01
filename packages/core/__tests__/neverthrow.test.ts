@@ -1,6 +1,6 @@
 // noinspection ES6UnusedImports
 import { describe, expect, test } from "bun:test";
-import { PayloadField, type ThatError } from "@thaterror/core";
+import { PayloadField, payloadOf, type ThatError } from "@thaterror/core";
 import { err, fromPromise } from 'neverthrow'
 import { AppError } from './define-error.test'
 
@@ -38,7 +38,8 @@ describe('neverthrow test', () => {
 
         if (result.isErr()) {
             expect(result.error.is(AppError.NotFound)).toBe(true);
-            expect(result.error[PayloadField][0]).toBe(404);
+            const [id] = payloadOf(result.error);
+            expect(id).toBe(404);
         }
     })
 })
