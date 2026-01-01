@@ -7,8 +7,7 @@
 ![GitHub License](https://img.shields.io/github/license/tarnishablec/thaterror)
 ![bundle size](https://img.shields.io/bundlephobia/minzip/@thaterror/core)
 ![typescript](https://badgen.net/badge/icon/typescript?icon=typescript&label)
-
-[//]: # (![GitHub commit activity]&#40;https://img.shields.io/github/commit-activity/m/tarnishablec/thaterror&#41;)
+[![CodeQL Analysis](https://github.com/tarnishablec/thaterror/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/tarnishablec/thaterror/actions/workflows/codeql-analysis.yml)
 
 A type-safe error handling library for TypeScript, heavily inspired by the experience of
 Rust's [thiserror](https://github.com/dtolnay/thiserror). It aims to remove the boilerplate while providing a seamless,
