@@ -9,9 +9,6 @@
       "url": "https://github.com/tarnishablec/thaterror/blob/main/LICENSE"
     }
   ],
-  "scripts": {
-    "test": "bun test --coverage --coverage-reporter=text --coverage-reporter=lcov --coverage-skip-test-files"
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/tarnishablec/thaterror.git"
