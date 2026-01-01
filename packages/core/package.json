@@ -4,6 +4,11 @@
     "description": "",
     "main": "src/index.ts",
     "type": "module",
+    "licenses": [
+        {
+            "url": "https://github.com/tarnishablec/thaterror/blob/main/LICENSE"
+        }
+    ],
     "scripts": {
         "test": "bun test --coverage --coverage-reporter=text --coverage-reporter=lcov --coverage-skip-test-files"
     },
@@ -16,6 +21,10 @@
             "import": "./src/index.ts"
         }
     },
+    "files": [
+        "src",
+        "package.json"
+    ],
     "devDependencies": {
         "hono": "^4.11.3"
     },
