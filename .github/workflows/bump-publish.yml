@@ -30,7 +30,7 @@ on:
             auto_merge:
                 description: 'Whether to automatically merge the created bump PR into the default branch (may fail if branch protection/required checks exist).'
                 required: false
-                default: 'no'
+                default: 'yes'
                 type: choice
                 options:
                     - no
