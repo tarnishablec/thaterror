@@ -30,7 +30,7 @@ on:
 
 permissions:
     contents: write    # for committing & pushing version changes
-    packages: write    # for publishing to GitHub Packages
+    packages: write    # kept (harmless) — publishing uses tokens via secrets
 
 jobs:
     bump-and-publish:
@@ -63,7 +63,6 @@ jobs:
                 run: |
                     set -euo pipefail
                     
-                    # Read the workflow input (expanded by GH). Use shell default if empty/null.
                     BUMP_TYPE="${{ github.event.inputs.bump }}"
                     if [ -z "${BUMP_TYPE}" ] || [ "${BUMP_TYPE}" = "null" ]; then
                       BUMP_TYPE="patch"
@@ -71,7 +70,6 @@ jobs:
                     echo "Requested bump type: $BUMP_TYPE"
                     
                     if [ "$BUMP_TYPE" = "none" ]; then
-                      # Skip bumping; use current version from package.json
                       NEW=$(jq -r .version package.json)
                       if [ -z "$NEW" ] || [ "$NEW" = "null" ]; then
                         echo "Failed to read current version from package.json"
@@ -79,7 +77,6 @@ jobs:
                       fi
                       echo "Skipping bump. Using current version: $NEW"
                     else
-                      # Use bun's version command to bump root package.json (no git tag)
                       if command -v bun >/dev/null 2>&1; then
                         bun pm version "$BUMP_TYPE" --no-git-tag-version
                       else
@@ -87,20 +84,16 @@ jobs:
                         exit 1
                       fi
                     
-                      # Read the new version from root package.json
                       NEW=$(jq -r .version package.json)
                       if [ -z "$NEW" ] || [ "$NEW" = "null" ]; then
                         echo "Failed to read new version from package.json"
                         exit 1
                       fi
-                    
                       echo "Bumped version: $NEW"
                     fi
                     
-                    # Export variables for subsequent steps
                     echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
                     echo "NEW_VERSION=$NEW" >> $GITHUB_ENV
-                    echo "NEW_VERSION=$NEW"
 
             -   name: Propagate new version to all packages/*/package.json
                 if: env.BUMP_TYPE != 'none'
@@ -115,7 +108,7 @@ jobs:
                       fi
                     done
 
-            -   name: 'Commit and push version changes (scheme B: normal push, fallback to --force-with-lease)'
+            -   name: 'Commit and push version changes (normal push, fallback to --force-with-lease)'
                 if: env.BUMP_TYPE != 'none'
                 env:
                     GIT_AUTHOR_NAME: github-actions
@@ -128,19 +121,15 @@ jobs:
                     if git status --porcelain | grep -q . ; then
                       BRANCH="bump-version/${NEW_VERSION}"
                       echo "Preparing branch $BRANCH and committing changes"
-                      # create or reset local branch to current HEAD
                       git checkout -B "$BRANCH"
                       git add package.json || true
                       git add packages/*/package.json || true
-                      # commit if there are staged changes; ignore if nothing to commit
                       git commit -m "chore(release): bump version to ${NEW_VERSION} [skip ci]" || true
                     
-                      # Try regular push first; if rejected, use safer force-with-lease
                       if git push --set-upstream origin "$BRANCH"; then
                         echo "Pushed version bump to origin/$BRANCH"
                       else
                         echo "Normal push failed, attempting force-with-lease"
-                        # fetch remote branch to make lease checks accurate (safe)
                         git fetch origin "$BRANCH" || true
                         git push --force-with-lease origin "$BRANCH"
                         echo "Force-with-lease pushed version bump to origin/$BRANCH"
@@ -161,10 +150,8 @@ jobs:
                     echo "Requested package to publish: ${PKG_INPUT}"
                     
                     if [ "${PKG_INPUT}" != "all" ]; then
-                      # support multiple package names separated by ','
                       IFS=',' read -ra PKGS <<< "$PKG_INPUT"
                       for PKG in "${PKGS[@]}"; do
-                        # trim whitespace
                         PKG="$(printf '%s' "${PKG}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
                         if [ -z "${PKG}" ]; then
                           echo "Warning: empty package name segment in input; skipping"
@@ -177,22 +164,35 @@ jobs:
                       done
                     fi
 
-            -   name: Configure npm auth for selected registries (npmjs and/or GitHub Packages)
+            -   name: Configure npm auth for selected registries (use GH_PACKAGES_PAT for GitHub)
                 env:
                     NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                    GH_PACKAGES_PAT: ${{ secrets.GH_PACKAGES_PAT }}
                 run: |
                     set -euo pipefail
-
+                    
                     PUBLISH="${{ github.event.inputs.publish }}"
                     if [ -z "${PUBLISH}" ] || [ "${PUBLISH}" = "null" ]; then
                       PUBLISH="both"
                     fi
                     echo "Publish target: ${PUBLISH}"
-
-                    # Prepare ~/.npmrc entries as needed. We avoid changing default registry;
-                    # publish commands will pass --registry explicitly.
-                    # Add npmjs token if needed
+                    
+                    # Prepare ~/.npmrc entries as needed. publish commands pass --registry explicitly.
+                    # GitHub Packages token (use the GH_PACKAGES_PAT secret you created)
+                    if [ "${PUBLISH}" = "both" ] || [ "${PUBLISH}" = "github" ]; then
+                      if [ -z "${GH_PACKAGES_PAT:-}" ]; then
+                        echo "Error: secrets.GH_PACKAGES_PAT is required to publish to GitHub Packages but is not set."
+                        exit 1
+                      fi
+                      # Write only GitHub Packages auth (host-level) into ~/.npmrc
+                      printf "//npm.pkg.github.com/:_authToken=%s\n" "${GH_PACKAGES_PAT}" > ~/.npmrc
+                      echo "Configured GitHub Packages auth in ~/.npmrc (token hidden)"
+                    else
+                      # ensure ~/.npmrc exists for potential npmjs append
+                      : > ~/.npmrc
+                    fi
+                    
+                    # npmjs token if needed
                     if [ "${PUBLISH}" = "both" ] || [ "${PUBLISH}" = "npmjs" ]; then
                       if [ -z "${NPM_TOKEN:-}" ]; then
                         echo "Error: secrets.NPM_TOKEN is required to publish to npmjs.org but is not set."
@@ -201,28 +201,18 @@ jobs:
                       printf "//registry.npmjs.org/:_authToken=%s\n" "${NPM_TOKEN}" >> ~/.npmrc
                       echo "Configured npmjs token in ~/.npmrc (token hidden)"
                     fi
-
-                    # Add GitHub Packages token if needed
-                    if [ "${PUBLISH}" = "both" ] || [ "${PUBLISH}" = "github" ]; then
-                      if [ -z "${GITHUB_TOKEN:-}" ]; then
-                        echo "Error: GITHUB_TOKEN is required to publish to GitHub Packages but is not set."
-                        exit 1
-                      fi
-                      # GitHub Packages uses npm.pkg.github.com
-                      printf "//npm.pkg.github.com/:_authToken=%s\n" "${GITHUB_TOKEN}" >> ~/.npmrc
-                      echo "Configured GitHub Packages token in ~/.npmrc (token hidden)"
-                    fi
-
+                    
                     echo "---- ~/.npmrc (non-sensitive preview) ----"
                     grep -v '_authToken' ~/.npmrc || true
                     echo "---- end ----"
 
-            -   name: Publish selected package(s) with bun (fallback to npm if needed) to selected registries
+            -   name: Publish selected package(s) with bun (fallback to npm) and fail on publish errors
                 env:
                     NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                    GH_PACKAGES_PAT: ${{ secrets.GH_PACKAGES_PAT }}
                 run: |
-                    set -euo pipefail
+                    # We intentionally do NOT set -e so we can collect per-package errors and fail at end.
+                    set -u -o pipefail
                     
                     PKG_INPUT="${{ github.event.inputs.package }}"
                     if [ -z "${PKG_INPUT}" ] || [ "${PKG_INPUT}" = "null" ]; then
@@ -233,12 +223,15 @@ jobs:
                       PUBLISH="both"
                     fi
                     
+                    failed=0
+                    fail_list=""
+                    
                     publish_to_registry() {
                       D="$1"
-                      REG="$2" # "npmjs" or "github"
+                      REG="$2"
                       if [ ! -f "$D/package.json" ]; then
                         echo "Skipping $D for $REG: package.json not found"
-                        return 1
+                        return 0
                       fi
                       if jq -e '.private == true' "$D/package.json" >/dev/null 2>&1; then
                         echo "Skipping $D for $REG: marked private"
@@ -251,17 +244,21 @@ jobs:
                       if [ "${REG}" = "npmjs" ]; then
                         REG_URL="https://registry.npmjs.org/"
                       else
-                        # GitHub Packages npm registry
                         REG_URL="https://npm.pkg.github.com/"
                       fi
                       echo "Publishing $NAME@$VER from $D to ${REG} (${REG_URL})"
+                    
                       if command -v bun >/dev/null 2>&1 ; then
                         if bun publish --registry="${REG_URL}"; then
                           echo "bun publish to ${REG} succeeded for $NAME"
+                          popd >/dev/null
+                          return 0
                         else
                           echo "bun publish to ${REG} failed for $NAME; attempting npm fallback"
                           if npm publish --registry="${REG_URL}"; then
                             echo "npm publish to ${REG} succeeded for $NAME"
+                            popd >/dev/null
+                            return 0
                           else
                             echo "npm publish to ${REG} failed for $NAME"
                             popd >/dev/null
@@ -272,30 +269,49 @@ jobs:
                         echo "bun not found; using npm publish to ${REG}"
                         if npm publish --registry="${REG_URL}"; then
                           echo "npm publish to ${REG} succeeded for $NAME"
+                          popd >/dev/null
+                          return 0
                         else
                           echo "npm publish to ${REG} failed for $NAME"
                           popd >/dev/null
                           return 1
                         fi
                       fi
-                      popd >/dev/null
-                      return 0
                     }
                     
                     publish_dir() {
                       D="$1"
-                      # If PUBLISH is both, attempt npmjs then github (continue on errors)
                       if [ "${PUBLISH}" = "both" ]; then
-                        publish_to_registry "$D" "npmjs" || echo "Warning: publish to npmjs failed for $D; continuing"
-                        publish_to_registry "$D" "github" || echo "Warning: publish to github failed for $D; continuing"
+                        publish_to_registry "$D" "npmjs"
+                        rc1=$?
+                        publish_to_registry "$D" "github"
+                        rc2=$?
+                        if [ $rc1 -ne 0 ] || [ $rc2 -ne 0 ]; then
+                          failed=$((failed+1))
+                          fail_list="${fail_list}${D} (npmjs:${rc1} github:${rc2})\n"
+                          return 1
+                        fi
                       elif [ "${PUBLISH}" = "npmjs" ]; then
-                        publish_to_registry "$D" "npmjs" || echo "Warning: publish to npmjs failed for $D"
+                        publish_to_registry "$D" "npmjs"
+                        rc=$?
+                        if [ $rc -ne 0 ]; then
+                          failed=$((failed+1))
+                          fail_list="${fail_list}${D} (npmjs)\n"
+                          return 1
+                        fi
                       elif [ "${PUBLISH}" = "github" ]; then
-                        publish_to_registry "$D" "github" || echo "Warning: publish to github failed for $D"
+                        publish_to_registry "$D" "github"
+                        rc=$?
+                        if [ $rc -ne 0 ]; then
+                          failed=$((failed+1))
+                          fail_list="${fail_list}${D} (github)\n"
+                          return 1
+                        fi
                       else
                         echo "Unknown publish target: ${PUBLISH}"
                         exit 1
                       fi
+                      return 0
                     }
                     
                     if [ "${PKG_INPUT}" = "all" ]; then
@@ -306,10 +322,8 @@ jobs:
                         fi
                       done
                     else
-                      # Support multiple package names separated by ','
                       IFS=',' read -ra PKGS <<< "$PKG_INPUT"
                       for PKG in "${PKGS[@]}"; do
-                        # trim whitespace
                         PKG="$(printf '%s' "${PKG}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
                         if [ -z "${PKG}" ]; then
                           echo "Warning: empty package name segment in input; skipping"
@@ -319,3 +333,10 @@ jobs:
                         publish_dir "${TARGET}" || true
                       done
                     fi
+                    
+                    if [ "$failed" -ne 0 ]; then
+                      echo -e "Publishing failed for the following packages:\n${fail_list}"
+                      exit 1
+                    fi
+                    
+                    echo "All requested publishes succeeded."
