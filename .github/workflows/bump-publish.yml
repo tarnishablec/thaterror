@@ -14,7 +14,7 @@ on:
                     - patch
                     - none
             package:
-                description: 'Which package(s) to publish (name(s) under packages/). Use "all" to publish all packages. To publish multiple packages at once, separate names with commas (e.g. "core,cli,utils"). Default: core'
+                description: 'Which package(s) to publish (name(s) under packages/). Use "all" to publish all packages. To publish multiple packages at once, separate names with commas (e.g. "core,cli[...]
                 required: false
                 default: 'core'
                 type: string
@@ -96,15 +96,20 @@ jobs:
                     echo "NEW_VERSION=$NEW" >> $GITHUB_ENV
 
             -   name: Propagate new version to all packages/*/package.json
-                if: env.BUMP_TYPE != 'none'
+                # 现在无论 bump 类型如何（包括 'none'）都会同步 root version 到 packages 下
                 run: |
                     set -euo pipefail
                     echo "Propagating version $NEW_VERSION to packages/*/package.json"
                     for P in packages/*; do
                       if [ -f "$P/package.json" ]; then
-                        jq --arg v "$NEW_VERSION" '.version = $v' "$P/package.json" > "$P/package.json.tmp"
-                        mv "$P/package.json.tmp" "$P/package.json"
-                        echo "Updated $P/package.json -> $(jq -r .version "$P/package.json")"
+                        OLD=$(jq -r .version "$P/package.json" || echo "")
+                        if [ "$OLD" != "$NEW_VERSION" ]; then
+                          jq --arg v "$NEW_VERSION" '.version = $v' "$P/package.json" > "$P/package.json.tmp"
+                          mv "$P/package.json.tmp" "$P/package.json"
+                          echo "Updated $P/package.json -> $(jq -r .version "$P/package.json")"
+                        else
+                          echo "No change for $P/package.json (already $NEW_VERSION)"
+                        fi
                       fi
                     done
 
