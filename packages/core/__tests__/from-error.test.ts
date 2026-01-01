@@ -12,7 +12,19 @@ class MyCustomError2 extends Error {
     }
 }
 
+
 describe('ErrorFamily from native error testing', () => {
+    const HttpBridgedError = AppError.bridge(HTTPException, (e, cases) => {
+        return e.status === 404
+            ? cases.NotFound(Number(e.message) || 0)
+            : e.status === 401
+                ? cases.Unauthorized()
+                : e.status === 500
+                    ? cases.DatabaseError(e.message)
+                    : cases.ShardError(0, "FORBIDDEN_SHARD")
+
+    })
+
     test('should chain up error family', () => {
         const ExAppError = AppError.enroll(MyCustomError, AppError.Unauthorized);
         const InferErr = ExAppError.from(new MyCustomError());
@@ -34,18 +46,19 @@ describe('ErrorFamily from native error testing', () => {
     })
 
     test('should bridge error correctly', () => {
-        const httpError = AppError.bridge(HTTPException, (e, cases) => {
-            return e.status === 404
-                ? cases.NotFound(Number(e.message) || 0)
-                : e.status === 401
-                    ? cases.Unauthorized()
-                    : e.status === 500
-                        ? cases.DatabaseError(e.message)
-                        : cases.ShardError(0, "FORBIDDEN_SHARD")
 
-        })
 
-        const nfErr = httpError.from(new HTTPException(404))
+        const nfErr = HttpBridgedError.from(new HTTPException(404))
         expect(nfErr.is(AppError.NotFound)).toBe(true);
+    })
+
+    test('should handle cause correctly', () => {
+        const customError = new MyCustomError();
+        const GenError = AppError.enroll(MyCustomError, AppError.Unauthorized);
+        expect(GenError.from(customError).cause).toBe(customError);
+
+        const not_found = new HTTPException(404);
+        expect(HttpBridgedError.from(not_found).cause).toBe(not_found);
+
     })
 })
