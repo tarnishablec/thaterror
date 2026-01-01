@@ -19,17 +19,25 @@ on:
                 default: 'core'
                 type: string
             publish:
-                description: 'Where to publish: "both" = npmjs.org and GitHub Packages, "npmjs" = npmjs.org only, "github" = GitHub Packages only'
+                description: 'Where to publish: "both" (default) = npmjs.org and GitHub Packages, "npmjs" = npmjs.org only, "github" = GitHub Packages only'
                 required: false
-                default: 'npmjs'
+                default: 'both'
                 type: choice
                 options:
                     - both
                     - npmjs
                     - github
+            auto_merge:
+                description: 'Whether to automatically merge the created bump PR into the default branch (may fail if branch protection/required checks exist).'
+                required: false
+                default: 'no'
+                type: choice
+                options:
+                    - no
+                    - yes
 
 permissions:
-    contents: write
+    contents: write    # for committing & pushing version changes and creating PRs
     packages: write
 
 jobs:
@@ -144,6 +152,81 @@ jobs:
                       echo "No changes to commit"
                     fi
 
+            -   name: Create Pull Request for version bump
+                if: env.BUMP_TYPE != 'none' && env.PUSHED_BRANCH != ''
+                env:
+                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    set -euo pipefail
+                    if [ -z "${PUSHED_BRANCH:-}" ]; then
+                      echo "No pushed branch recorded; skipping PR creation"
+                      exit 0
+                    fi
+
+                    REPO="${GITHUB_REPOSITORY}"
+                    BRANCH="${PUSHED_BRANCH}"
+                    NEW_VERSION="${NEW_VERSION}"
+
+                    echo "Repository: $REPO"
+                    echo "Branch: $BRANCH"
+                    echo "Version: $NEW_VERSION"
+
+                    # get default branch
+                    DEFAULT_BRANCH=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}" | jq -r .default_branch)
+                    echo "Default branch is: $DEFAULT_BRANCH"
+
+                    PR_TITLE="chore(release): bump version to v${NEW_VERSION}"
+                    PR_BODY="Automated version bump to v${NEW_VERSION} by workflow: ${{ github.workflow }}\n\nBranch: ${BRANCH}"
+
+                    # create PR
+                    RESP=$(curl -s -X POST \
+                      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                      -H "Accept: application/vnd.github+json" \
+                      "https://api.github.com/repos/${REPO}/pulls" \
+                      -d "$(jq -n --arg t "$PR_TITLE" --arg h "$BRANCH" --arg b "$DEFAULT_BRANCH" --arg body "$PR_BODY" '{title:$t, head:$h, base:$b, body:$body, maintainer_can_modify:true}')" )
+
+                    PR_URL=$(echo "$RESP" | jq -r .html_url // empty)
+                    PR_NUMBER=$(echo "$RESP" | jq -r .number // empty)
+                    PR_MESSAGE=$(echo "$RESP" | jq -r .message // empty)
+
+                    if [ -n "$PR_URL" ] && [ "$PR_URL" != "null" ]; then
+                      echo "Created PR: $PR_URL"
+                      echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+                    else
+                      echo "Failed to create PR: $PR_MESSAGE"
+                      echo "API response: $RESP"
+                      exit 1
+                    fi
+
+            -   name: Auto-merge bump PR (optional)
+                if: env.BUMP_TYPE != 'none' && github.event.inputs.auto_merge == 'yes' && env.PR_NUMBER != ''
+                env:
+                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    set -euo pipefail
+                    REPO="${GITHUB_REPOSITORY}"
+                    PR="${PR_NUMBER}"
+                    echo "Attempting to merge PR #${PR}..."
+
+                    # Try to merge (squash). This will fail if branch protection / required checks prevent it.
+                    MERGE_RESP=$(curl -s -X PUT \
+                      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                      -H "Accept: application/vnd.github+json" \
+                      "https://api.github.com/repos/${REPO}/pulls/${PR}/merge" \
+                      -d '{"commit_title":"chore(release): merge bump","merge_method":"squash"}')
+
+                    merged=$(echo "$MERGE_RESP" | jq -r .merged // false)
+                    message=$(echo "$MERGE_RESP" | jq -r .message // empty)
+
+                    if [ "$merged" = "true" ]; then
+                      echo "PR #${PR} merged successfully."
+                    else
+                      echo "Failed to auto-merge PR #${PR} : $message"
+                      echo "Merge response: $MERGE_RESP"
+                      # If you need a PAT that can bypass protections, set it in secrets (e.g. MERGE_PAT) and re-run with that token.
+                      exit 1
+                    fi
+
             -   name: Validate target package(s) presence
                 run: |
                     set -euo pipefail
@@ -181,17 +264,22 @@ jobs:
                     fi
                     echo "Publish target: ${PUBLISH}"
                     
+                    # Prepare ~/.npmrc entries as needed. publish commands pass --registry explicitly.
+                    # GitHub Packages token (use the GH_PACKAGES_PAT secret you created)
                     if [ "${PUBLISH}" = "both" ] || [ "${PUBLISH}" = "github" ]; then
                       if [ -z "${GH_PACKAGES_PAT:-}" ]; then
                         echo "Error: secrets.GH_PACKAGES_PAT is required to publish to GitHub Packages but is not set."
                         exit 1
                       fi
+                      # Write only GitHub Packages auth (host-level) into ~/.npmrc
                       printf "//npm.pkg.github.com/:_authToken=%s\n" "${GH_PACKAGES_PAT}" > ~/.npmrc
                       echo "Configured GitHub Packages auth in ~/.npmrc (token hidden)"
                     else
+                      # ensure ~/.npmrc exists for potential npmjs append
                       : > ~/.npmrc
                     fi
                     
+                    # npmjs token if needed
                     if [ "${PUBLISH}" = "both" ] || [ "${PUBLISH}" = "npmjs" ]; then
                       if [ -z "${NPM_TOKEN:-}" ]; then
                         echo "Error: secrets.NPM_TOKEN is required to publish to npmjs.org but is not set."
@@ -200,12 +288,17 @@ jobs:
                       printf "//registry.npmjs.org/:_authToken=%s\n" "${NPM_TOKEN}" >> ~/.npmrc
                       echo "Configured npmjs token in ~/.npmrc (token hidden)"
                     fi
+                    
+                    echo "---- ~/.npmrc (non-sensitive preview) ----"
+                    grep -v '_authToken' ~/.npmrc || true
+                    echo "---- end ----"
 
             -   name: Publish selected package(s) with bun (fallback to npm) and fail on publish errors
                 env:
                     NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
                     GH_PACKAGES_PAT: ${{ secrets.GH_PACKAGES_PAT }}
                 run: |
+                    # We intentionally do NOT set -e so we can collect per-package errors and fail at end.
                     set -u -o pipefail
                     
                     PKG_INPUT="${{ github.event.inputs.package }}"
