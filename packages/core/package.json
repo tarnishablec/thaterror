@@ -26,7 +26,8 @@
     "package.json"
   ],
   "devDependencies": {
-    "hono": "^4.11.3"
+    "hono": "^4.11.3",
+    "neverthrow": "^8.2.0"
   },
   "publishConfig": {
     "access": "public"

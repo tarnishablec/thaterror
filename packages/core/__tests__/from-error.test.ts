@@ -59,6 +59,5 @@ describe('ErrorFamily from native error testing', () => {
 
         const not_found = new HTTPException(404);
         expect(HttpBridgedError.from(not_found).cause).toBe(not_found);
-
     })
 })

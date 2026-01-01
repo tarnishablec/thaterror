@@ -7,7 +7,7 @@ import {
     PayloadField,
     ScopeField,
     scopeOf,
-    That
+    That,
 } from "@thaterror/core"
 
 export const AppError = That({

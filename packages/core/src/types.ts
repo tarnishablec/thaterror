@@ -173,3 +173,38 @@ export type ErrorMapOf<F> =
 export type ErrorUnionOf<F> =
     F extends ErrorFamily<infer M, infer _Es>
         ? ErrorUnionOfMap<M> : never
+
+
+/**
+ * Extracts a specific subset of DefinedError instances from an ErrorFamily.
+ * Strictly prohibits `any` to maintain nominal type integrity.
+ *
+ * @template F - The ErrorFamily instance (e.g., `typeof AppError`).
+ * @template K - Keys to extract from the ErrorMap. Defaults to all keys.
+ *
+ * @example
+ * ### USE CASE: Basic Usage
+ * ```ts
+ * type ErrType = ThatError<typeof AppError>;
+ * ```
+ *
+ * @example
+ * ### USE CASE: Integration with neverthrow
+ * ```ts
+ * function fetchData(): ResultAsync<string, ThatError<typeof AppError, 'Timeout' | 'Network'>> {
+ * return fromPromise(
+ * api.get('/data'),
+ * (e: unknown) => AppError.bridge(e as Error, (err, cases) => {
+ * if (err.message.includes('timeout')) return cases.Timeout();
+ * return cases.Network();
+ * }) as ThatError<typeof AppError, 'Timeout' | 'Network'>
+ * );
+ * }
+ * ```
+ */
+export type ThatError<
+    F,
+    K extends keyof ErrorMapOf<F> = keyof ErrorMapOf<F>
+> = ErrorUnionOfMap<{
+    [P in K & string]: ErrorMapOf<F>[P]
+}>
