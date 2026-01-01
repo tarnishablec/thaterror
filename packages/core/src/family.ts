@@ -75,7 +75,7 @@ class OperatorImpl<M extends ErrorMap, Es extends readonly (readonly [Error, Err
 
         const entry: RegistryEntry<M> = {
             type: 'enroll',
-            cls: errorClass as unknown as ErrorConstructor,
+            cls: errorClass,
             errorCase: errorCase as unknown as (...args: unknown[]) => ErrorUnionOfMap<M>,
             transformer
         };
@@ -83,30 +83,35 @@ class OperatorImpl<M extends ErrorMap, Es extends readonly (readonly [Error, Err
         return createFamilyInstance<M, Upsert<Es, E, U>>(
             this._cases,
             this._scope,
-            [...this._registry.filter(r => r.cls !== (errorClass as unknown as ErrorConstructor)), entry]
+            [...this._registry.filter(r => r.cls !== (errorClass)), entry]
         );
 
     }
 
-    from<E extends Error>(error: E): Extract<Es[number], readonly [E, unknown]>[1] {
+    from<E extends Error>(error: E): Es[number][1] {
         const registry = this._registry;
+
         for (let i = registry.length - 1; i >= 0; i--) {
             const entry = registry[i];
 
             if (entry && error instanceof entry.cls) {
+                let result: Es[number][1];
+
                 if (entry.type === 'bridge') {
-                    // 这里的 mapper 已经在 RegistryEntry 中定义为 (e: Error, cases: ...)
-                    const result = entry.mapper(error, this._cases);
-                    if (result) return result as Extract<Es[number], readonly [E, unknown]>[1];
-                    continue;
+                    const mapped = entry.mapper(error, this._cases);
+                    if (!mapped) continue;
+                    result = mapped;
+                } else {
+                    const payload = entry.transformer ? entry.transformer(error) : [];
+                    result = entry.errorCase(...payload);
                 }
 
-                const payload = entry.transformer ? entry.transformer(error) : [];
-                return entry.errorCase(...payload) as Extract<Es[number], readonly [E, unknown]>[1];
+                result.cause = error;
+                return result;
             }
         }
 
-        return error as unknown as Extract<Es[number], readonly [E, unknown]>[1];
+        throw new Error(`No matching error case found for ${error.constructor.name}`);
     }
 }
 

@@ -28,8 +28,9 @@ describe('ErrorFamily from native error testing', () => {
 
         expect(ExrAppError.from(new MyCustomError()).is(AppError.NotFound)).toBe(true)
 
+        const unenrolledError = new MyCustomError2();
         // @ts-expect-error
-        ExrAppError.from(new MyCustomError2())
+        expect(() => ExrAppError.from(unenrolledError)).toThrowError(Error)
     })
 
     test('should bridge error correctly', () => {
