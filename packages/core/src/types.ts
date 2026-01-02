@@ -189,7 +189,7 @@ export type ErrorUnionOf<F> =
  * ```
  */
 export type ThatError<
-    F,
+    F = unknown,
     K extends keyof ErrorMapOf<F> = keyof ErrorMapOf<F>
 > = ErrorUnionOfMap<{
     [P in K & string]: ErrorMapOf<F>[P]

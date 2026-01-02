@@ -11,7 +11,7 @@ describe('pino logger test', () => {
         // noinspection JSUnusedGlobalSymbols
         const logger = pino({
             serializers: {
-                err: (e: ThatError<typeof AppError>) => {
+                err: (e: ThatError) => {
                     return {
                         type: e.constructor.name,
                         message: e.message,
