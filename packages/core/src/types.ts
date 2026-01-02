@@ -12,6 +12,8 @@ export interface DefinedError<
     readonly [PayloadField]: Payload;
     readonly [CodeField]: Code;
 
+    at(options?: ErrorOptions): this;
+
     is<K extends string, S extends ErrorSpec>(errorCase: ErrorCase<K, S>): this is DefinedError<K, ExtractPayload<S>>;
 }
 
@@ -36,8 +38,8 @@ export type ErrorUnionOfMap<M extends ErrorMap> = {
 
 export type ErrorCase<K extends string, S extends ErrorSpec> =
     ([S] extends [(...args: infer A) => string]
-        ? (...args: [...args: A, options?: ErrorOptions]) => DefinedError<K, A>
-        : (options?: ErrorOptions) => DefinedError<K, never[]>)
+        ? (...args: A) => DefinedError<K, A>
+        : () => DefinedError<K, never[]>)
     & { readonly [CodeField]: K; readonly [ScopeField]: symbol };
 
 export interface ErrorFamilyOperator<M extends ErrorMap, Es extends readonly (readonly [Error, ErrorUnionOfMap<M>])[] = []> {
@@ -125,11 +127,15 @@ export interface ErrorFamilyOperator<M extends ErrorMap, Es extends readonly (re
     ): Extract<Es[number], readonly [E, unknown]>[1];
 }
 
-export type ErrorFamily<M extends ErrorMap, Es extends readonly (readonly [Error, ErrorUnionOfMap<M>])[] = []> = {
-    readonly [K in keyof M & string]: ErrorCase<K, M[K]>;
-} & {
-    readonly [ScopeField]: symbol;
-} & ErrorFamilyOperator<M, Es>;
+export type ErrorFamilyCases<M extends ErrorMap> = { readonly [K in keyof M & string]: ErrorCase<K, M[K]> };
+
+export type ErrorFamily<M extends ErrorMap, Es extends readonly (readonly [Error, ErrorUnionOfMap<M>])[] = []> =
+    ErrorFamilyCases<M>
+    &
+    {
+        readonly [ScopeField]: symbol;
+    }
+    & ErrorFamilyOperator<M, Es>;
 
 /**
  * Extracts the specific instance type from an Error constructor.

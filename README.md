@@ -66,8 +66,8 @@ export const AppError = That({
 
     DatabaseError: (query: string) => `Database Error: ${query}`
 }).enroll(/** your external errors */)
-  .enroll(/** ... */)
-  .bridge(/** ... */)
+    .enroll(/** ... */)
+    .bridge(/** ... */)
 ```
 
 ### 2. Throw and Catch
@@ -143,6 +143,71 @@ try {
     }
 }
 ```
+
+## 🧪 Deterministic Tracing: The "Callback-Local" Anchor
+
+In JavaScript, asynchronous stack traces are notoriously fragile. When you wrap errors inside a callback
+like [neverthrow](https://github.com/supermacro/neverthrow) 's `ResultAsync.fromPromise`, the stack trace often points to
+the library's internal dispatchers rather than your business logic.
+
+```ts
+import { ResultAsync } from 'neverthrow';
+
+function connectToDatabase(url: string) {
+    return ResultAsync.fromPromise(
+        fetch(url),
+        (err) => {
+            // 🚨 THE ISSUE:
+            // When this callback is executed, the physical execution flow 
+            // is already deep inside neverthrow's internal logic.
+            // A standard 'new Error' captures a snapshot full of library noise.
+            return new Error(`Failed to connect: ${url}`);
+        }
+    );
+}
+```
+The Resulting "Messy" Stack Trace:
+```shell
+Error: Failed to connect: ***url***
+    at /project/node_modules/neverthrow/dist/index.cjs.js:106:34  <-- 🛑 Useless! Internal library code.
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /project/src/main.ts:15:20
+```
+
+You’ll notice the top frames point to internal files of `neverthrow`, making it impossible to see where your business logic actually failed.
+
+```ts
+const result = await connectToDatabase("ws://localhost:3000");
+if (result.isErr()) {
+    console.log(result.error.stack);
+}
+```
+
+`thaterror` solves this by decoupling **Error Creation** from **Context Annotation**.
+
+### The "Magic" of `.at()`
+
+By using the chainable `.at()`  method, you force the V8 engine to capture the stack trace at the **exact
+moment** of failure within your callback.
+
+```typescript
+// 🟢 The ResultAsync Way (Best Practice)
+return ResultAsync.fromPromise(
+    client.connect(url),
+    (error) => MCPError.CONNECTION_FAILED(url).at({ cause: error }) // or leave it empty `.at()`
+);
+```
+🎯 The "Crime Scene": Callback Freedom
+With the .at() anchor, you are finally free to nest your business logic deep within any callback without fear of losing context.
+
+To be honest, at the implementation level, `.at()` is almost a "no-op" (it just returns `this`). However, in the physical world of V8 and asynchronous microtasks, it acts as a **Quantum Observer**.
+
+#### Why "It Just Works":
+- **Microtask Locking**: By calling `.at()` immediately within your callback, you force the engine to interact with the error object before the current microtask ends. This "extra step" effectively nails the stack trace to the physical floor before the asynchronous execution context evaporates.
+- **Optimization Barrier**: It prevents the JIT compiler from over-optimizing (inlining) the factory call into the library's internal dispatchers, preserving the "Crime Scene" frames.
+- **Future-Proofing**: It provides a stable entry point for future metadata (like `traceId` or `severity`) without refactoring your entire codebase.
+
+> **Man, what can I say?** We can't fully explain why the ghost of the stack trace stays longer when you call `.at()`, but the experimental evidence is clear: **It just works.** Call it, and you'll never have to guess where your errors came from again.
 
 ## 🔍 Why thaterror?
 

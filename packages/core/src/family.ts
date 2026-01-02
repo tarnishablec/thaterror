@@ -1,6 +1,6 @@
 import {
     type ErrorCase,
-    type ErrorFamily,
+    type ErrorFamily, type ErrorFamilyCases,
     type ErrorFamilyOperator,
     type ErrorMap,
     type ErrorUnionOfMap,
@@ -24,7 +24,7 @@ interface BridgeEntry<M extends ErrorMap> {
     readonly cls: BasicErrorClass;
     readonly mapper: (
         e: Error,
-        cases: Record<string, (...args: unknown[]) => ErrorUnionOfMap<M>>
+        cases: ErrorFamilyCases<M>
     ) => ErrorUnionOfMap<M> | undefined;
 }
 
@@ -33,7 +33,7 @@ type RegistryEntry<M extends ErrorMap> = EnrollEntry<M> | BridgeEntry<M>;
 class OperatorImpl<M extends ErrorMap, Es extends readonly (readonly [Error, ErrorUnionOfMap<M>])[]>
     implements ErrorFamilyOperator<M, Es> {
     constructor(
-        private readonly _cases: Record<string, (...args: unknown[]) => ErrorUnionOfMap<M>>,
+        private readonly _cases:ErrorFamilyCases<M>,
         private readonly _scope: symbol,
         private readonly _registry: readonly RegistryEntry<M>[] = []
     ) {
@@ -119,7 +119,7 @@ export function createFamilyInstance<
     M extends ErrorMap,
     Es extends readonly (readonly [Error, ErrorUnionOfMap<M>])[]
 >(
-    cases: Record<string, (...args: unknown[]) => ErrorUnionOfMap<M>>,
+    cases: ErrorFamilyCases<M>,
     scope: symbol,
     registry: readonly RegistryEntry<M>[]
 ): ErrorFamily<M, Es> {

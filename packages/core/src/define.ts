@@ -5,6 +5,7 @@ import {
     ErrorBrand,
     type ErrorCase,
     type ErrorFamily,
+    type ErrorFamilyCases,
     type ErrorMap,
     type ErrorSpec,
     type ErrorUnionOfMap,
@@ -18,7 +19,7 @@ export function That<const M extends ErrorMap>(
     map: M
 ): ErrorFamily<M> {
     const scope = Symbol("ErrorFamilyScope");
-    const cases: Record<string, (...args: unknown[]) => ErrorUnionOfMap<M>> = {};
+    const cases: Partial<ErrorFamilyCases<M>> = {};
 
     for (const key in map) {
         const spec = map[key];
@@ -33,20 +34,23 @@ export function That<const M extends ErrorMap>(
             readonly [CodeField]: Code;
 
             constructor(
-                caller: typeof cases[typeof key],
                 readonly code: Code,
                 args: Payload,
                 readonly scope: symbol,
                 message: string,
-                options?: ErrorOptions,
             ) {
-                super(message, options);
+                super(message);
                 this.name = code;
                 this[CodeField] = code;
                 this[ScopeField] = scope;
                 this[PayloadField] = args;
 
-                Error.captureStackTrace(this, caller);
+                Error.captureStackTrace(this);
+            }
+
+            at(options?: ErrorOptions): this {
+                this.cause = options?.cause;
+                return this;
             }
 
             is<K extends string, S extends ErrorSpec>(errorCase: ErrorCase<K, S>): this is DefinedError<K, ExtractPayload<S>> {
@@ -56,35 +60,25 @@ export function That<const M extends ErrorMap>(
 
         Object.defineProperty(InternalBaseError, 'name', {value: key, configurable: true});
 
-        const factory = (...args: unknown[]): ErrorUnionOfMap<M> => {
-            let finalArgs = args;
-            let options: ErrorOptions | undefined;
+        const factory = (...args: Payload): ErrorUnionOfMap<M> => {
+            let message: string;
 
             if (typeof spec === "function") {
-                if (args.length > spec.length) {
-                    const lastArg = args[args.length - 1];
-                    if (lastArg !== null && typeof lastArg === "object" && !Array.isArray(lastArg)) {
-                        options = lastArg as ErrorOptions;
-                        finalArgs = args.slice(0, -1);
-                    }
-                }
-                const message = (spec as (...a: unknown[]) => string)(...finalArgs);
-                return new InternalBaseError(factory, key, finalArgs as Payload, scope, message, options);
+                message = (spec as (...a: unknown[]) => string)(...args);
+            } else if (typeof spec === "string") {
+                message = spec;
+            } else {
+                throw new Error(`Invalid error spec ${spec}`)
             }
 
-            if (typeof spec === "string") {
-                options = args[0] as ErrorOptions | undefined;
-                return new InternalBaseError(factory, key, [] as Payload, scope, spec, options);
-            }
-
-            throw new Error("Invalid ErrorSpec");
+            return new InternalBaseError(key, args, scope, message);
         };
 
-        Reflect.set(factory, CodeField, key);
-        Reflect.set(factory, ScopeField, scope);
+        factory[CodeField] = key;
+        factory[ScopeField] = scope;
 
-        cases[key] = factory;
+        Reflect.set(cases, key, factory);
     }
 
-    return createFamilyInstance<M, []>(cases, scope, []);
+    return createFamilyInstance<M, []>(cases as ErrorFamilyCases<M>, scope, []);
 }
