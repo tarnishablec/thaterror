@@ -33,11 +33,12 @@ export function That<const M extends ErrorMap>(
             readonly [CodeField]: Code;
 
             constructor(
+                caller: typeof cases[typeof key],
                 readonly code: Code,
                 args: Payload,
                 readonly scope: symbol,
                 message: string,
-                options?: ErrorOptions
+                options?: ErrorOptions,
             ) {
                 super(message, options);
                 this.name = code;
@@ -45,7 +46,7 @@ export function That<const M extends ErrorMap>(
                 this[ScopeField] = scope;
                 this[PayloadField] = args;
 
-                Error.captureStackTrace(this, this.constructor);
+                Error.captureStackTrace(this, caller);
             }
 
             is<K extends string, S extends ErrorSpec>(errorCase: ErrorCase<K, S>): this is DefinedError<K, ExtractPayload<S>> {
@@ -68,12 +69,12 @@ export function That<const M extends ErrorMap>(
                     }
                 }
                 const message = (spec as (...a: unknown[]) => string)(...finalArgs);
-                return new InternalBaseError(key, finalArgs as Payload, scope, message, options);
+                return new InternalBaseError(factory, key, finalArgs as Payload, scope, message, options);
             }
 
             if (typeof spec === "string") {
                 options = args[0] as ErrorOptions | undefined;
-                return new InternalBaseError(key, [] as Payload, scope, spec, options);
+                return new InternalBaseError(factory, key, [] as Payload, scope, spec, options);
             }
 
             throw new Error("Invalid ErrorSpec");
