@@ -165,23 +165,21 @@ function connectToDatabase(url: string) {
         }
     );
 }
+
+const result = await connectToDatabase("ws://localhost:3000");
+if (result.isErr()) {
+    console.log(result.error.stack);
+}
 ```
 The Resulting "Messy" Stack Trace:
 ```shell
-Error: Failed to connect: ***url***
+Error: Failed to connect: "ws://localhost:3000"
     at /project/node_modules/neverthrow/dist/index.cjs.js:106:34  <-- 🛑 Useless! Internal library code.
     at processTicksAndRejections (node:internal/process/task_queues:95:5)
     at async /project/src/main.ts:15:20
 ```
 
 You’ll notice the top frames point to internal files of `neverthrow`, making it impossible to see where your business logic actually failed.
-
-```ts
-const result = await connectToDatabase("ws://localhost:3000");
-if (result.isErr()) {
-    console.log(result.error.stack);
-}
-```
 
 `thaterror` solves this by decoupling **Error Creation** from **Context Annotation**.
 
