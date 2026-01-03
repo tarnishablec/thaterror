@@ -17,7 +17,7 @@ Define a family of domain errors with a single `That()` call and get:
 - `enroll` and `bridge` to map external errors into your family
 - Optional adapters (e.g. pino) for logging and serialization
 
-## Installation
+## 📦 Installation
 
 ```bash
 npm install @thaterror/core
@@ -25,7 +25,7 @@ npm install @thaterror/core
 bun add @thaterror/core
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
 Create a central `errors.ts` to define your family:
 
@@ -56,7 +56,7 @@ if (e instanceof Error) {
 }
 ```
 
-## Adopting external errors
+## 🧪 Adopting external errors
 
 ### enroll (one-to-one)
 
@@ -106,7 +106,7 @@ try {
 }
 ```
 
-## Deterministic Tracing with `.with()`
+## 🎯 Deterministic Tracing with `.with()`
 
 When creating errors inside callbacks (for example, `ResultAsync.fromPromise`), V8 may capture a stack trace that
 starts inside the callback library rather than your code. Calling `.with()` within the callback preserves the stack

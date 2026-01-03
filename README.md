@@ -15,37 +15,51 @@ A concise, type-safe error handling toolkit for TypeScript inspired by Rust's th
 `@thaterror/core` package to define domain-driven error families with zero boilerplate, then adopt
 or serialize them with optional adapters (for example, a `pino` adapter is available).
 
+## The Core Value
+
+Handling `Error` in large-scale TypeScript projects can be frustrating:
+
+- `instanceof` is not always reliable across different packages, multiple versions, or due to structural typing matches.
+- Error context (Payload) is often lost during propagation.
+- Integrating third-party errors (e.g., `Hono`, `TypeORM`, `SyntaxError`) into your domain model usually requires messy
+  manual conversion.
+
+`thaterror` solves these with a **Schema-first** philosophy, bringing **Rust-like ergonomics** to TypeScript error
+handling.
+
+## ✨ Features
+
+- **🎯 Zero Boilerplate**: A single `That` call generates error factories with built-in type guards and payload
+  support.
+- **🏗️ Domain-Driven**: Define error families that encapsulate your business logic.
+- **🌉 Native Integration**: "Naturalize" external errors into your family using `enroll` and `bridge`.
+- **🧠 Intelligent Transformation**: The `from` method provides strict type checking, ensuring only registered error
+  types are processed.
+- **🦾 Total Type Safety**: Perfect type narrowing that automatically infers payload types from your schema.
+- **🦀 thiserror-like Experience**: Declarative, robust, and designed for developers who value type correctness.
+
+## 🚀 Quick Start
+
 This repository is split into focused packages:
 
-- [packages/core](./packages/core) — the main library: how to define errors, strong typing, adapters.
-- [packages/pino-adapter](./packages/pino-adapter) — a small adapter to serialize `ThatError` instances for `pino`.
-
-Quick links
-
-- Core docs and examples: ./packages/core/README.md
-- Pino adapter: ./packages/pino-adapter/README.md
+- [@thaterror/core](./packages/core) — the main library: how to define errors, strong typing, adapters.
+- [@thaterror/pino-adapter](./packages/pino-adapter) — a small adapter to serialize `ThatError` instances for `pino`.
 
 Installation
 
 To use the core library:
 
 ```bash
-npm install @thaterror/core
-# or with bun
 bun add @thaterror/core
+// or with npm
+npm install @thaterror/core
 ```
 
 If you want the pino adapter for structured logging:
 
 ```bash
-npm install @thaterror/pino-adapter pino
+bun add @thaterror/pino-adapter pino
 ```
-
-Why split the docs?
-
-- The repo root stays as a short project overview and entry point.
-- `packages/core` contains the concrete usage examples, API examples and advanced topics.
-- Package READMEs (like the pino adapter) are short and focused on integration and examples.
 
 Contributing
 
