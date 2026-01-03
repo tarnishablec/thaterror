@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/@thaterror/pino-adapter.svg)](https://www.npmjs.com/package/@thaterror/adapter)
 
-A small adapter to serialize and log `ThatError` instances with `pino`.
+A small adapter to serialize and log `ThatError` instances with [pino](https://github.com/pinojs/pino).
 
 This README shows installation and usage examples. For core library usage and error-family definitions, see
 `../core/README.md`.
@@ -29,7 +29,7 @@ import pino from 'pino';
 import {thaterrorSerializer, thaterrorHooks} from '@thaterror/pino-adapter';
 
 export const logger = pino({
-    serializers: {err: thaterrorSerializer},   // <-- add the serializer
+    serializers: {thaterror: thaterrorSerializer},   // <-- add the serializer
     transport: {
         target: "pino-pretty",
         options: {
