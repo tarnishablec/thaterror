@@ -16,7 +16,7 @@ on:
             package:
                 description: 'Package names (comma separated) or "all"'
                 required: false
-                default: 'core'
+                default: 'core;pino-serializer'
                 type: string
             publish:
                 description: 'Publish destination'
@@ -58,7 +58,7 @@ jobs:
                 run: |
                     set -euo pipefail
                     BUMP_TYPE="${{ github.event.inputs.bump }}"
-                    
+
                     if [ "$BUMP_TYPE" = "none" ]; then
                       NEW_VER=$(jq -r .version package.json)
                       echo "Skipping version bump. Current: $NEW_VER"
@@ -68,7 +68,7 @@ jobs:
                       NEW_VER=$(jq -r .version package.json)
                       echo "Bumped to new version: $NEW_VER"
                     fi
-                    
+
                     echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
                     echo "NEW_VERSION=$NEW_VER" >> $GITHUB_ENV
 
@@ -90,7 +90,7 @@ jobs:
                     set -euo pipefail
                     git config user.name "github-actions[bot]"
                     git config user.email "github-actions[bot]@users.noreply.github.com"
-                    
+
                     if git status --porcelain | grep -q . ; then
                       BRANCH_NAME="bump-version/${NEW_VERSION}"
                       git checkout -B "$BRANCH_NAME"
@@ -106,16 +106,16 @@ jobs:
                     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                 run: |
                     set -euo pipefail
-                    
+
                     # Create Pull Request using GitHub CLI
                     PR_URL=$(gh pr create \
                       --title "chore(release): v${NEW_VERSION}" \
                       --body "Automated version bump to ${NEW_VERSION}" \
                       --base "main" \
                       --head "${PUSHED_BRANCH}")
-                    
+
                     echo "Created PR: $PR_URL"
-                    
+
                     # Auto-merge if requested
                     if [ "${{ github.event.inputs.auto_merge }}" = "true" ]; then
                       # --auto: waits for status checks to pass before merging
@@ -132,14 +132,14 @@ jobs:
                 run: |
                     set -euo pipefail
                     PUBLISH_TARGET="${{ github.event.inputs.publish }}"
-                    
+
                     # Initialize .npmrc
                     : > ~/.npmrc
-                    
+
                     if [[ "$PUBLISH_TARGET" == "both" || "$PUBLISH_TARGET" == "github" ]]; then
                       printf "//npm.pkg.github.com/:_authToken=%s\n" "${GH_PACKAGES_PAT}" >> ~/.npmrc
                     fi
-                    
+
                     if [[ "$PUBLISH_TARGET" == "both" || "$PUBLISH_TARGET" == "npmjs" ]]; then
                       printf "//registry.npmjs.org/:_authToken=%s\n" "${NPM_TOKEN}" >> ~/.npmrc
                     fi
@@ -149,14 +149,14 @@ jobs:
                 run: |
                     # Continue on error to attempt publishing all selected packages
                     set -u -o pipefail
-                    
+
                     PKG_INPUT="${{ github.event.inputs.package }}"
                     PUBLISH_TARGET="${{ github.event.inputs.publish }}"
-                    
+
                     # Define registry URLs
                     NPMJS_REG="https://registry.npmjs.org/"
                     GPR_REG="https://npm.pkg.github.com/"
-                    
+
                     publish_cmd() {
                       local dir=$1
                       local reg_url=$2
@@ -164,7 +164,7 @@ jobs:
                       # Try bun publish, fallback to npm if it fails
                       (cd "$dir" && bun publish --registry="$reg_url") || (cd "$dir" && npm publish --registry="$reg_url")
                     }
-                    
+
                     # Logic for "all" or specific list
                     if [ "$PKG_INPUT" = "all" ]; then
                       TARGETS=$(ls -d packages/*)
@@ -173,7 +173,7 @@ jobs:
                       TARGETS=""
                       for i in "${ADDR[@]}"; do TARGETS+=" packages/${i// /}"; done
                     fi
-                    
+
                     for D in $TARGETS; do
                       if [ -d "$D" ] && [ -f "$D/package.json" ]; then
                         if [[ "$PUBLISH_TARGET" == "both" || "$PUBLISH_TARGET" == "npmjs" ]]; then
