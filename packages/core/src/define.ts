@@ -11,13 +11,10 @@ import {
     type ErrorUnionOfMap,
     type ExtractPayload,
     PayloadField,
-    ScopeField
+    ScopeField,
 } from "./types";
 
-
-export function That<const M extends ErrorMap>(
-    map: M
-): ErrorFamily<M> {
+export function That<const M extends ErrorMap>(map: M): ErrorFamily<M> {
     const scope = Symbol();
     const cases: Partial<ErrorFamilyCases<M>> = {};
 
@@ -27,7 +24,10 @@ export function That<const M extends ErrorMap>(
         type Payload = ExtractPayload<M[typeof key]>;
         type Code = typeof key;
 
-        const InternalBaseError = class extends Error implements DefinedError<Code, Payload> {
+        const InternalBaseError = class
+            extends Error
+            implements DefinedError<Code, Payload>
+        {
             readonly [ErrorBrand] = true as const;
             readonly [ScopeField]: symbol;
             readonly [PayloadField]: Payload;
@@ -54,12 +54,17 @@ export function That<const M extends ErrorMap>(
                 return this;
             }
 
-            is<K extends string, S extends ErrorSpec>(errorCase: ErrorCase<K, S>): this is DefinedError<K, ExtractPayload<S>> {
-                return this[CodeField] as unknown === errorCase[CodeField];
+            is<K extends string, S extends ErrorSpec>(
+                errorCase: ErrorCase<K, S>,
+            ): this is DefinedError<K, ExtractPayload<S>> {
+                return (this[CodeField] as unknown) === errorCase[CodeField];
             }
         };
 
-        Object.defineProperty(InternalBaseError, 'name', {value: key, configurable: true});
+        Object.defineProperty(InternalBaseError, "name", {
+            value: key,
+            configurable: true,
+        });
 
         const factory = (...args: Payload): ErrorUnionOfMap<M> => {
             let message: string;
@@ -69,7 +74,7 @@ export function That<const M extends ErrorMap>(
             } else if (typeof spec === "string") {
                 message = spec;
             } else {
-                throw new Error(`Invalid error spec ${spec}`)
+                throw new Error(`Invalid error spec ${spec}`);
             }
 
             return new InternalBaseError(factory, key, args, scope, message);

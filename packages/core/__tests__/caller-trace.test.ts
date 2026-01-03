@@ -1,16 +1,16 @@
 // noinspection ES6UnusedImports
 import { describe, expect, test } from "bun:test";
-import { That } from '@thaterror/core';
-import { ResultAsync } from 'neverthrow';
+import { That } from "@thaterror/core";
+import { ResultAsync } from "neverthrow";
 
 describe("ThatError Location Anchoring", () => {
     const AppError = That({
         SYNC_ERR: "Sync failure",
         ASYNC_ERR: (url: string) => `Async failure: ${url}`,
-        LOC_ERR: "Location test error"
+        LOC_ERR: "Location test error",
     });
 
-    const pathSegments = new URL(import.meta.url).pathname.split('/');
+    const pathSegments = new URL(import.meta.url).pathname.split("/");
     const currentFileName = pathSegments.at(-1) ?? "";
 
     // --- Scenario 1: The Native Way (Messy) ---
@@ -24,7 +24,7 @@ describe("ThatError Location Anchoring", () => {
                      * A standard 'new Error' is captured here, but the stack trace
                      * will be cluttered with neverthrow's internal dispatcher frames.
                      */
-                    new Error(`Native wrap: ${error}`)
+                    new Error(`Native wrap: ${error}`),
             ).andThen(() => {
                 throw new Error("Should not happen");
             });
@@ -71,7 +71,7 @@ describe("ThatError Location Anchoring", () => {
                 // The engine captures the stack during 'new', but without the
                 // explicit anchor, the trace quality depends purely on V8's mood.
                 return AppError.LOC_ERR();
-            }
+            },
         );
 
         if (result.isErr()) {
@@ -84,29 +84,27 @@ describe("ThatError Location Anchoring", () => {
 
     // --- Scenario 4: Synchronous Business Logic ---
     test("Sync: stack trace should anchor at the business caller via .at()", () => {
-            function businessFunction() {
-                /**
-                 * 💡 THE ANCHOR POINT
-                 * We call .at() here to explicitly mark this line as the "Crime Scene".
-                 */
-                return AppError.SYNC_ERR().with(void 0);
-            }
-
-            const err = businessFunction();
-            const stack = err.stack ?? "";
-            const topFrame = stack.split("\n")[1];
-
-            // 🎯 Verification: The first frame must point to 'businessFunction' in THIS file.
-            expect(topFrame).toContain("businessFunction");
-            expect(topFrame).toContain(currentFileName);
-
-            // 🛡️ Noise Removal: The factory internals (define.ts) must be sliced off.
-            expect(topFrame).not.toContain("define.ts");
-
-            console.log(stack.split("\n").slice(0, 4).join("\n"));
+        function businessFunction() {
+            /**
+             * 💡 THE ANCHOR POINT
+             * We call .at() here to explicitly mark this line as the "Crime Scene".
+             */
+            return AppError.SYNC_ERR().with(void 0);
         }
-    )
-    ;
+
+        const err = businessFunction();
+        const stack = err.stack ?? "";
+        const topFrame = stack.split("\n")[1];
+
+        // 🎯 Verification: The first frame must point to 'businessFunction' in THIS file.
+        expect(topFrame).toContain("businessFunction");
+        expect(topFrame).toContain(currentFileName);
+
+        // 🛡️ Noise Removal: The factory internals (define.ts) must be sliced off.
+        expect(topFrame).not.toContain("define.ts");
+
+        console.log(stack.split("\n").slice(0, 4).join("\n"));
+    });
 
     // --- Scenario 5: Neverthrow Async Callback ---
     test("Async: stack trace should anchor inside neverthrow callback via .at()", async () => {
@@ -122,8 +120,8 @@ describe("ThatError Location Anchoring", () => {
                  * By calling .at() inside this anonymous closure, we lock the stack
                  * to this exact line in the business logic.
                  */
-                return AppError.ASYNC_ERR(url).with({cause: error});
-            }
+                return AppError.ASYNC_ERR(url).with({ cause: error });
+            },
         );
 
         if (result.isErr()) {

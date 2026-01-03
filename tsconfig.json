@@ -1,8 +1,6 @@
 {
     "compilerOptions": {
-        "lib": [
-            "ESNext"
-        ],
+        "lib": ["ESNext"],
         "target": "ESNext",
         "module": "Preserve",
         "moduleDetection": "force",
@@ -25,12 +23,8 @@
         "strictFunctionTypes": true,
         "useDefineForClassFields": true,
         "paths": {
-            "@thaterror/*": [
-                "./packages/*/src"
-            ]
+            "@thaterror/*": ["./packages/*/src"]
         }
     },
-    "include": [
-        "packages/**/*.ts"
-    ]
+    "include": ["packages/**/*.ts"]
 }

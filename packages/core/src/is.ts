@@ -2,7 +2,7 @@ import { type DefinedError, ErrorBrand, ScopeField } from "./types";
 
 export function isDefinedError<E extends DefinedError>(
     error: unknown,
-    scope?: symbol
+    scope?: symbol,
 ): error is E {
     if (!(error instanceof Error) || !(ErrorBrand in error)) {
         return false;

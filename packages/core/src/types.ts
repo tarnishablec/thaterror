@@ -14,7 +14,9 @@ export interface DefinedError<
 
     with(options?: ErrorOptions): this;
 
-    is<K extends string, S extends ErrorSpec>(errorCase: ErrorCase<K, S>): this is DefinedError<K, ExtractPayload<S>>;
+    is<K extends string, S extends ErrorSpec>(
+        errorCase: ErrorCase<K, S>,
+    ): this is DefinedError<K, ExtractPayload<S>>;
 }
 
 export type ErrorSpec =
@@ -25,10 +27,11 @@ export type ErrorSpec =
      */
     | ((...args: never[]) => string);
 
-export type ExtractPayload<S extends ErrorSpec> =
-    S extends (...args: infer A) => string
-        ? A
-        : never[];
+export type ExtractPayload<S extends ErrorSpec> = S extends (
+    ...args: infer A
+) => string
+    ? A
+    : never[];
 
 export type ErrorMap = Record<string, ErrorSpec>;
 
@@ -36,13 +39,19 @@ export type ErrorUnionOfMap<M extends ErrorMap> = {
     [K in keyof M & string]: DefinedError<K, ExtractPayload<M[K]>>;
 }[keyof M & string];
 
-export type ErrorCase<K extends string, S extends ErrorSpec> =
-    ([S] extends [(...args: infer A) => string]
-        ? (...args: A) => DefinedError<K, A>
-        : () => DefinedError<K, never[]>)
-    & { readonly [CodeField]: K; readonly [ScopeField]: symbol };
+export type ErrorCase<K extends string, S extends ErrorSpec> = ([S] extends [
+    (...args: infer A) => string,
+]
+    ? (...args: A) => DefinedError<K, A>
+    : () => DefinedError<K, never[]>) & {
+    readonly [CodeField]: K;
+    readonly [ScopeField]: symbol;
+};
 
-export interface ErrorFamilyOperator<M extends ErrorMap, Es extends readonly (readonly [Error, ErrorUnionOfMap<M>])[] = []> {
+export interface ErrorFamilyOperator<
+    M extends ErrorMap,
+    Es extends readonly (readonly [Error, ErrorUnionOfMap<M>])[] = [],
+> {
     /**
      * Registers an Error class into the family mapping it to a specific variant.
      * ### 🧬 TYPE CAPTURE
@@ -62,10 +71,10 @@ export interface ErrorFamilyOperator<M extends ErrorMap, Es extends readonly (re
      * @returns A new `ErrorFamily` instance with an updated type-safe registry.
      */
     enroll<
-        T extends { new(...args: never[]): Error; readonly prototype: Error },
+        T extends { new (...args: never[]): Error; readonly prototype: Error },
         K extends keyof M & string,
         U extends ErrorUnionOfMap<M>,
-        E extends InstanceOfError<T>
+        E extends InstanceOfError<T>,
     >(
         errorClass: T,
         errorCase: ErrorCase<K, M[K]> & ((...args: never[]) => U),
@@ -80,12 +89,15 @@ export interface ErrorFamilyOperator<M extends ErrorMap, Es extends readonly (re
      * Allows a single error class to be dispatched to different cases based on runtime properties.
      */
     bridge<
-        T extends { new(...args: never[]): Error; readonly prototype: Error },
+        T extends { new (...args: never[]): Error; readonly prototype: Error },
         C extends ErrorUnionOfMap<M>,
         E extends InstanceOfError<T>,
     >(
         errorClass: T,
-        mapper: (e: E, cases: { [K in keyof M & string]: ErrorCase<K, M[K]> }) => C
+        mapper: (
+            e: E,
+            cases: { [K in keyof M & string]: ErrorCase<K, M[K]> },
+        ) => C,
     ): ErrorFamily<M, Upsert<Es, E, C>>;
 
     /**
@@ -109,33 +121,41 @@ export interface ErrorFamilyOperator<M extends ErrorMap, Es extends readonly (re
      * does not match the registered set.
      */
     from<E extends Error>(
-        error: E & (
-            [NoInfer<E>] extends [Es[number][0]]
-                ? (
-                    true extends (
-                            Es[number][0] extends infer U
-                                ? (U extends Error
-                                    ? ([E] extends [U] ? ([U] extends [E] ? true : never) : never)
-                                    : never)
-                                : never
-                            )
-                        ? unknown
-                        : { __STATUS__: "ERROR_NOT_ENROLLED"; message: "This specific error class was not enrolled" }
-                    )
-                : { __STATUS__: "TYPE_NOT_ENROLLED"; message: "Type structure not found in family" }
-            )
+        error: E &
+            ([NoInfer<E>] extends [Es[number][0]]
+                ? true extends (
+                      Es[number][0] extends infer U
+                          ? U extends Error
+                              ? [E] extends [U]
+                                  ? [U] extends [E]
+                                      ? true
+                                      : never
+                                  : never
+                              : never
+                          : never
+                  )
+                    ? unknown
+                    : {
+                          __STATUS__: "ERROR_NOT_ENROLLED";
+                          message: "This specific error class was not enrolled";
+                      }
+                : {
+                      __STATUS__: "TYPE_NOT_ENROLLED";
+                      message: "Type structure not found in family";
+                  }),
     ): Extract<Es[number], readonly [E, unknown]>[1];
 }
 
-export type ErrorFamilyCases<M extends ErrorMap> = { readonly [K in keyof M & string]: ErrorCase<K, M[K]> };
+export type ErrorFamilyCases<M extends ErrorMap> = {
+    readonly [K in keyof M & string]: ErrorCase<K, M[K]>;
+};
 
-export type ErrorFamily<M extends ErrorMap, Es extends readonly (readonly [Error, ErrorUnionOfMap<M>])[] = []> =
-    ErrorFamilyCases<M>
-    &
-    {
-        readonly [ScopeField]: symbol;
-    }
-    & ErrorFamilyOperator<M, Es>;
+export type ErrorFamily<
+    M extends ErrorMap,
+    Es extends readonly (readonly [Error, ErrorUnionOfMap<M>])[] = [],
+> = ErrorFamilyCases<M> & {
+    readonly [ScopeField]: symbol;
+} & ErrorFamilyOperator<M, Es>;
 
 /**
  * Extracts the specific instance type from an Error constructor.
@@ -157,29 +177,37 @@ export type ErrorFamily<M extends ErrorMap, Es extends readonly (readonly [Error
  * are preserved in the transformer.
  */
 export type InstanceOfError<T> = T extends { readonly prototype: infer P }
-    ? P extends Error ? P : Error
+    ? P extends Error
+        ? P
+        : Error
     : Error;
 
 /**
  * Updates or inserts a type mapping into the Error Family tuple.
  * the recursive tail as a valid tuple array.
  */
-export type Upsert<T extends readonly (readonly [Error, unknown])[], E extends Error, C> =
-    T extends readonly [readonly [infer CurE, infer CurC], ...infer Rest]
-        ? [E] extends [CurE]
-            ? readonly [[E, C], ...Rest]
-            : readonly [[CurE, CurC], ...Upsert<Extract<Rest, readonly (readonly [Error, unknown])[]>, E, C>]
-        : readonly [[E, C]];
+export type Upsert<
+    T extends readonly (readonly [Error, unknown])[],
+    E extends Error,
+    C,
+> = T extends readonly [readonly [infer CurE, infer CurC], ...infer Rest]
+    ? [E] extends [CurE]
+        ? readonly [[E, C], ...Rest]
+        : readonly [
+              [CurE, CurC],
+              ...Upsert<
+                  Extract<Rest, readonly (readonly [Error, unknown])[]>,
+                  E,
+                  C
+              >,
+          ]
+    : readonly [[E, C]];
 
 export type ErrorMapOf<F> =
-    F extends ErrorFamily<infer M, infer _Es>
-        ? M
-        : never;
+    F extends ErrorFamily<infer M, infer _Es> ? M : never;
 
 export type ErrorUnionOf<F> =
-    F extends ErrorFamily<infer M, infer _Es>
-        ? ErrorUnionOfMap<M> : never
-
+    F extends ErrorFamily<infer M, infer _Es> ? ErrorUnionOfMap<M> : never;
 
 /**
  * Extracts a specific subset of DefinedError instances from an ErrorFamily.
@@ -196,7 +224,7 @@ export type ErrorUnionOf<F> =
  */
 export type ThatError<
     F = unknown,
-    K extends keyof ErrorMapOf<F> = keyof ErrorMapOf<F>
+    K extends keyof ErrorMapOf<F> = keyof ErrorMapOf<F>,
 > = ErrorUnionOfMap<{
-    [P in K & string]: ErrorMapOf<F>[P]
-}>
+    [P in K & string]: ErrorMapOf<F>[P];
+}>;
