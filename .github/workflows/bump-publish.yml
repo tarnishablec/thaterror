@@ -138,24 +138,20 @@ jobs:
                     fi
 
             -   name: Configure NPM registries
-                env:
-                    NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-                    GH_PACKAGES_PAT: ${{ secrets.GH_PACKAGES_PAT }}
                 run: |
                     set -euo pipefail
                     PUBLISH_TARGET="${{ github.event.inputs.publish }}"
 
-                    # Initialize .npmrc
-                    : > ~/.npmrc
-
-                    if [[ "$PUBLISH_TARGET" == "both" || "$PUBLISH_TARGET" == "github" ]]; then
-                      printf "//npm.pkg.github.com/:_authToken=%s\n" "${GH_PACKAGES_PAT}" >> ~/.npmrc
-                    fi
+                    touch .npmrc
 
                     if [[ "$PUBLISH_TARGET" == "both" || "$PUBLISH_TARGET" == "npmjs" ]]; then
-                      printf "//registry.npmjs.org/:_authToken=%s\n" "${NPM_TOKEN}" >> ~/.npmrc
+                      echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> .npmrc
                     fi
-                    echo "NPM registries configured."
+
+                    if [[ "$PUBLISH_TARGET" == "both" || "$PUBLISH_TARGET" == "github" ]]; then
+                      echo "@YOUR_SCOPE:registry=https://npm.pkg.github.com" >> .npmrc
+                      echo "//npm.pkg.github.com/:_authToken=${{ secrets.GH_PACKAGES_PAT }}" >> .npmrc
+                    fi
 
             -   name: Publish selected packages
                 run: |
