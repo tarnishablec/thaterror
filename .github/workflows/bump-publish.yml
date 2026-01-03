@@ -43,7 +43,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             -   name: Checkout repository
-                uses: actions/checkout@v4
+                uses: actions/checkout@v6
                 with:
                     fetch-depth: 0
                     persist-credentials: true
@@ -174,7 +174,7 @@ jobs:
                       local reg_url=$2
                       echo "Publishing $dir to $reg_url..."
                       # Try bun publish, fallback to npm if it fails
-                      (cd "$dir" && bun publish --registry="$reg_url") || (cd "$dir" && npm publish --registry="$reg_url")
+                      (cd "$dir" && bun publish --registry="$reg_url") || (cd "$dir" && pnpm publish --registry="$reg_url")
                     }
 
                     # Logic for "all" or specific list
