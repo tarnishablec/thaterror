@@ -10,9 +10,9 @@ This README shows installation and usage examples. For core library usage and er
 ## Installation
 
 ```bash
-npm install @thaterror/pino-adapter pino
+npm install @thaterror/pino-adapter pino pino-pretty
 # or with bun
-bun add @thaterror/pino-adapter pino
+bun add @thaterror/pino-adapter pino pino-pretty
 ```
 
 ## Features
