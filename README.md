@@ -65,7 +65,7 @@ See the individual package READMEs for development and testing instructions.
 
 ## Comparison ✨ — `Rust thiserror` / `@thaterror/core` / `Native Error`
 
-Rust (thiserror) 🦀
+Rust (`thiserror`) 🦀
 
 ```rust
 use thiserror::Error;
@@ -99,9 +99,9 @@ TypeScript (`@thaterror/core`) 🛡️
 import {That, type ThatError} from '@thaterror/core';
 
 const App = That({
-    NotFound: (id: string) => ({id}),
-    InvalidInput: (reason: string) => ({reason}),
-    DbError: (cause: unknown) => ({cause}),
+    NotFound: (id: string) => `not found: ${id}`,
+    InvalidInput: (input: string) => `invalid input: ${input}`,
+    DbError: (query: string) => `db error: ${query}`,
 });
 
 type AppError = ThatError<typeof App>;
@@ -116,33 +116,29 @@ throw App.NotFound('123');
 // - Cost: minimal boilerplate with strong TypeScript typing.
 ```
 
-Use `@thaterror/core` with [neverthrow](https://github.com/supermacro/neverthrow) — full Rust-like Result<T, E> experience 🧭
+Use `@thaterror/core` with [neverthrow](https://github.com/supermacro/neverthrow) — full Rust-like Result<T, E> experience 🦀
 
 ```ts
 // Combine @thaterror/core (typed errors) with neverthrow's Result for ergonomic,
 // exhaustiveness-friendly flow control similar to Rust's `Result<T, E>`.
-import {That, type ThatError} from '@thaterror/core';
+import {type ThatError} from '@thaterror/core';
 import {errAsync, ResultAsync} from 'neverthrow';
+import {AppError} from './error'
 import {dbFind} from 'db'; // assume dbFind(id) returns Promise<User | undefined>
 
-const AppError = That({
-    NotFound: (id: string) => ({id}),
-    InvalidInput: (reason: string) => ({reason}),
-    DbError: (cause: unknown) => ({cause}),
-});
-
-type AppError = ThatError<typeof AppError>;
+type AppErrorType = ThatError<typeof AppError>;
 
 // Async neverthrow example function to find a user by ID:
 // - returns ResultAsync<User, AppError>
-const findUser = (id: string): ResultAsync<T, AppError> => {
+const findUser = (id: string): ResultAsync<T, AppErrorType> => {
     // Immediate validation using neverthrow's async helpers (no try/catch)
-    if (!id) return errAsync(AppError.InvalidInput('id empty'));
+    if (!id) return errAsync(AppError.InvalidInput(id));
 
     // Wrap the DB promise and map any rejection into AppError
     return ResultAsync.fromPromise(
         dbFind(id),
-        (e) => AppError.DbError(e)
+        // asume e.query is string
+        (e) => AppError.DbError(e.query).with({cause: e})
     ).andThen(r => {
         if (!r) return errAsync(AppError.NotFound(id));
         return ResultAsync.ok(r);
@@ -160,13 +156,13 @@ class NotFoundError extends Error {
   }
 }
 class InvalidInputError extends Error {
-  constructor(public reason: string) {
-    super(`invalid input: ${reason}`);
+  constructor(public input: string) {
+    super(`invalid input: ${input}`);
     this.name = 'InvalidInputError';
   }
 }
 class DbError extends Error {
-  constructor(public cause: unknown) {
+  constructor(public query: string) {
     super('db error');
     this.name = 'DbError';
   }
@@ -175,6 +171,7 @@ class DbError extends Error {
 throw new NotFoundError('123')
 
 // Quick notes for native Error:
+// - Lack of scope: no built-in grouping of related errors.
 // - Type & payload: requires manual extension; TypeScript typing is weaker compared to enums/That.
 // - Pattern matching: consumers often use `instanceof` or `error.name`, which is less safe.
 // - Cross-package reliability: `instanceof` can be fragile across bundles/versions.
