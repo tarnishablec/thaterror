@@ -142,7 +142,7 @@ const findUser = (id: string): ResultAsync<T, AppError> => {
     // Wrap the DB promise and map any rejection into AppError
     return ResultAsync.fromPromise(
         dbFind(id),
-        (e) => App.DbError(e)
+        (e) => AppError.DbError(e)
     ).andThen(r => {
         if (!r) return errAsync(AppError.NotFound(id));
         return ResultAsync.ok(r);
