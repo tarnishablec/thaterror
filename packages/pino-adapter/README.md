@@ -47,7 +47,7 @@ export const logger = pino({
 ```ts
 // main.ts
 import {logger} from './logger.ts';
-import {AppError} from './errors.ts';
+import {MCPError} from './errors.ts';
 
 logger.fatal(MCPError.MCP_CONNECTION_FAILED("ws://localhost:3000/mcp"));
 ```
