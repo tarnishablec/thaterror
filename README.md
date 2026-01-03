@@ -61,9 +61,126 @@ If you want the pino adapter for structured logging:
 bun add @thaterror/pino-adapter pino
 ```
 
-Contributing
-
 See the individual package READMEs for development and testing instructions.
+
+## Examples ✨ — `Rust thiserror` / `@thaterror/core` / `Native Error`
+
+Rust (thiserror) 🦀
+
+```rust
+use thiserror::Error;
+// Add serde derives for easy serialization/deserialization
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Error, Serialize, Deserialize)]
+pub enum AppError {
+    #[error("not found: {0}")]
+    NotFound(String),
+
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
+
+    // Use a serializable payload in the README example to keep the serde example accurate.
+    #[error("db error: {0}")]
+    DbError(String),
+}
+
+// Quick notes for thiserror:
+// - Type & payload: enums carry payloads at the type level and enable exhaustive matching.
+// - Pattern matching: use `match` for exhaustive, compile-time checked branching.
+// - Serialization: straightforward with `serde` — derive `Serialize`/`Deserialize`. For a clean
+//   discriminated JSON shape, add a serde tag on the enum.
+// - Cost: language-level safety and performance; highly reliable for in-binary error modeling.
+```
+
+TypeScript (`@thaterror/core`) 🛡️
+
+```ts
+import {That, type ThatError} from '@thaterror/core';
+
+const App = That({
+    NotFound: (id: string) => ({id}),
+    InvalidInput: (reason: string) => ({reason}),
+    DbError: (cause: unknown) => ({cause}),
+});
+
+type AppError = ThatError<typeof App>;
+
+throw App.NotFound('123');
+
+// Quick notes for @thaterror/core:
+// - Type & payload: carries payloads in the type system and supports safe narrowing.
+// - Pattern matching: built-in type guards enable exhaustive, type-safe branching.
+// - Cross-package reliability: guards and schema-style definitions are robust across modules.
+// - Serialization & adapters: ships adapters (e.g. pino) for structured logging/transport.
+// - Cost: minimal boilerplate with strong TypeScript typing.
+```
+
+Use `@thaterror/core` with `neverthrow` — full Rust-like Result<T, E> experience 🧭
+
+```ts
+// Combine @thaterror/core (typed errors) with neverthrow's Result for ergonomic,
+// exhaustiveness-friendly flow control similar to Rust's `Result<T, E>`.
+import {That, type ThatError} from '@thaterror/core';
+import {errAsync, ResultAsync} from 'neverthrow';
+import {dbFind} from 'db'; // assume dbFind(id) returns Promise<User | undefined>
+
+const AppError = That({
+    NotFound: (id: string) => ({id}),
+    InvalidInput: (reason: string) => ({reason}),
+    DbError: (cause: unknown) => ({cause}),
+});
+
+type AppError = ThatError<typeof AppError>;
+
+// Async neverthrow example function to find a user by ID:
+// - returns ResultAsync<User, AppError>
+const findUser = (id: string): ResultAsync<T, AppError> => {
+    // Immediate validation using neverthrow's async helpers (no try/catch)
+    if (!id) return errAsync(AppError.InvalidInput('id empty'));
+
+    // Wrap the DB promise and map any rejection into AppError
+    return ResultAsync.fromPromise(
+        dbFind(id),
+        (e) => App.DbError(e)
+    ).andThen(r => {
+        if (!r) return errAsync(AppError.NotFound(id));
+        return ResultAsync.ok(r);
+    })
+};
+```
+
+TypeScript (native `Error`) ⚠️
+
+```ts
+class NotFoundError extends Error {
+  constructor(public id: string) {
+    super(`not found: ${id}`);
+    this.name = 'NotFoundError';
+  }
+}
+class InvalidInputError extends Error {
+  constructor(public reason: string) {
+    super(`invalid input: ${reason}`);
+    this.name = 'InvalidInputError';
+  }
+}
+class DbError extends Error {
+  constructor(public cause: unknown) {
+    super('db error');
+    this.name = 'DbError';
+  }
+}
+
+throw new NotFoundError('123')
+
+// Quick notes for native Error:
+// - Type & payload: requires manual extension; TypeScript typing is weaker compared to enums/That.
+// - Pattern matching: consumers often use `instanceof` or `error.name`, which is less safe.
+// - Cross-package reliability: `instanceof` can be fragile across bundles/versions.
+// - Serialization: needs explicit conversion for structured logs/transport.
+// - Cost: simplest to implement but lacks the type-level guarantees of the other approaches.
+```
 
 ## 📜 License
 
