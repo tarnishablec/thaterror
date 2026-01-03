@@ -148,12 +148,13 @@ like [neverthrow](https://github.com/supermacro/neverthrow) 's `ResultAsync.from
 the library's internal dispatchers rather than your business logic.
 
 ```ts
+// location: project/mcp/client.ts
 import {ResultAsync} from 'neverthrow';
 import {MCPError} from "./error";
 
-function connectToDatabase(url: string) {
+function connectTo(url: string) {
     return ResultAsync.fromPromise(
-        fetch(url),
+        client.connect(url),
         (_err) => {
             // 🚨 THE ISSUE:
             // When this callback is executed, the physical execution flow 
