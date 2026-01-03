@@ -53,6 +53,9 @@ jobs:
                 with:
                     bun-version: 'latest'
 
+            -   name: Setup Biome CLI
+                uses: biomejs/setup-biome@v2
+
             -   name: Determine version and bump
                 id: bump
                 run: |
@@ -74,15 +77,24 @@ jobs:
 
             -   name: Propagate version to sub-packages
                 run: |
-                    set -euo pipefail
-                    # Update version in all workspace packages
-                    for P in packages/*; do
-                      if [ -f "$P/package.json" ]; then
-                        jq --arg v "$NEW_VERSION" '.version = $v' "$P/package.json" > "$P/package.json.tmp"
-                        mv "$P/package.json.tmp" "$P/package.json"
-                        echo "Updated $P/package.json to $NEW_VERSION"
-                      fi
-                    done
+                    bun -e "
+                      const fs = require('fs');
+                      const glob = require('glob');
+                      const version = process.env.NEW_VERSION;
+                      const packages = fs.readdirSync('packages');
+
+                      packages.forEach(p => {
+                        const path = \`packages/\${p}/package.json\`;
+                        if (fs.existsSync(path)) {
+                          const json = JSON.parse(fs.readFileSync(path, 'utf8'));
+                          json.version = version;
+                          fs.writeFileSync(path, JSON.stringify(json, null, 2) + '\\n');
+                        }
+                      });
+                    "
+
+            -   name: Fix formatting with Biome
+                run: biome check --write packages/*/package.json package.json
 
             -   name: Commit and push changes
                 if: env.BUMP_TYPE != 'none'
