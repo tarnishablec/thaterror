@@ -158,7 +158,7 @@ function connectToDatabase(url: string) {
             // 🚨 THE ISSUE:
             // When this callback is executed, the physical execution flow 
             // is already deep inside neverthrow's internal logic.
-            return AppError.ConnectionError(url);
+            return MCPError.CONNECTION_FAILED(url);
         }
     );
 }
@@ -185,11 +185,21 @@ moment** of failure within your callback.
 
 ```typescript
 // 🟢 The ResultAsync Way (Best Practice)
+// location: project/mcp/client.ts
 return ResultAsync.fromPromise(
     client.connect(url),
-    (error) => AppError.CONNECTION_FAILED(url).with({ cause: error })
+    (error) => MCPError.CONNECTION_FAILED(url).with({ cause: error })
 );
 ```
+now the stack trace points to your business logic:
+```shell
+Error: Failed to connect: "ws://localhost:3000"
+    at /project/mcp/client.ts:15:11  <-- 🟢 Useful! Business code.
+    at /project/node_modules/neverthrow/dist/index.cjs.js:106:34 
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /project/src/main.ts:15:20
+```
+
 🎯 The "Crime Scene": Callback Freedom
 With the .with() anchor, you are finally free to nest your business logic deep within any callback without fear of losing context.
 
