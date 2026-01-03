@@ -98,7 +98,7 @@ TypeScript (`@thaterror/core`) 🛡️
 ```ts
 import {That, type ThatError} from '@thaterror/core';
 
-const App = That({
+const AppError = That({
     NotFound: (id: string) => `not found: ${id}`,
     InvalidInput: (input: string) => `invalid input: ${input}`,
     DbError: (query: string) => `db error: ${query}`,
@@ -106,7 +106,7 @@ const App = That({
 
 type AppError = ThatError<typeof App>;
 
-throw App.NotFound('123');
+throw AppError.NotFound('123');
 
 // Quick notes for @thaterror/core:
 // - Type & payload: carries payloads in the type system and supports safe narrowing.
