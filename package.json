@@ -1,7 +1,6 @@
 {
     "name": "thaterror",
     "private": true,
-    "version": "0.3.6",
     "workspaces": [
         "packages/*"
     ],

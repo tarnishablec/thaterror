@@ -2,7 +2,7 @@
     "$schema": "https://unpkg.com/@changesets/config/schema.json",
     "changelog": "@changesets/cli/changelog",
     "commit": false,
-    "fixed": [],
+    "fixed": [["@thaterror/*"]],
     "linked": [],
     "access": "restricted",
     "baseBranch": "main",
