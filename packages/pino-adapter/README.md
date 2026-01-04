@@ -1,6 +1,6 @@
 # @thaterror/pino-adapter
 
-[![npm version](https://img.shields.io/npm/v/@thaterror/pino-adapter.svg)](https://www.npmjs.com/package/@thaterror/adapter)
+[![npm version](https://img.shields.io/npm/v/@thaterror/pino-adapter.svg)](https://www.npmjs.com/package/@thaterror/pino-adapter)
 
 A small adapter to serialize and log `ThatError` instances with [pino](https://github.com/pinojs/pino).
 
