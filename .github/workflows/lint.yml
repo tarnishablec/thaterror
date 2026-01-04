@@ -18,7 +18,7 @@ jobs:
                     bun-version: latest
 
             -   name: Install Dependencies
-                run: bun install
+                run: bun install --ignore-scripts
 
             -   name: Syncpack Check
                 run: bunx syncpack list-mismatches

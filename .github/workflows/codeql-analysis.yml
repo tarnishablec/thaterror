@@ -43,7 +43,7 @@ jobs:
                             - '**/node_modules/**'
 
             -   name: Install Dependencies
-                run: bun install
+                run: bun install --ignore-scripts
 
             -   name: Perform CodeQL Analysis
                 uses: github/codeql-action/analyze@v4

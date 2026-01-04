@@ -30,7 +30,7 @@ jobs:
                   bun-version: latest
 
             - name: Install Dependencies
-              run: bun install
+              run: bun install --ignore-scripts
 
             - name: Create PR or Publish
               id: changesets
