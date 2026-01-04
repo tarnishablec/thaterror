@@ -1,4 +1,4 @@
-name: Professional Release Workflow
+name: Changeset Release Workflow
 
 on:
     # Phase 1: Manual trigger to prepare the Release PR
@@ -32,6 +32,12 @@ jobs:
             - name: Install Dependencies
               run: bun install
 
+            - name: Alias npm to bun
+              run: |
+                  mkdir -p $HOME/.local/bin
+                  ln -s $(which bun) $HOME/.local/bin/npm
+                  echo "$HOME/.local/bin" >> $GITHUB_PATH
+
             - name: Create PR or Publish
               id: changesets
               uses: changesets/action@v1
@@ -44,6 +50,7 @@ jobs:
 
                   # Automatically create the GitHub Release UI page
                   createGithubReleases: true
+
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
